@@ -1,0 +1,171 @@
+name: eventhub
+
+x-app: &app
+  restart: unless-stopped
+  init: true
+
+x-node-health: &node-health
+  test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  interval: 15s
+  timeout: 5s
+  retries: 5
+  start_period: 15s
+
+x-python-health: &python-health
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+  interval: 15s
+  timeout: 5s
+  retries: 5
+  start_period: 15s
+
+services:
+  nginx:
+    <<: *app
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    <<: *app
+    build: ./frontend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    <<: *app
+    build: ./gateway
+    healthcheck: *node-health
+    environment:
+      PORT: "3000"
+      IDENTITY_URL: http://identity:3000
+      EVENTS_URL: http://events:8000
+      REGISTRATIONS_URL: http://registrations:8000
+      PAYMENTS_URL: http://payments:3000
+      NOTIFICATIONS_URL: http://notifications:8000
+
+  identity:
+    <<: *app
+    build: ./services/identity
+    healthcheck: *node-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: identity_user
+      PGDATABASE: identity_db
+      PGPASSWORD: ${IDENTITY_DB_PASSWORD:?Defina IDENTITY_DB_PASSWORD no .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  events:
+    <<: *app
+    build: ./services/events
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: event_user
+      PGDATABASE: event_db
+      PGPASSWORD: ${EVENT_DB_PASSWORD:?Defina EVENT_DB_PASSWORD no .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  registrations:
+    <<: *app
+    build: ./services/registrations
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: registration_user
+      PGDATABASE: registration_db
+      PGPASSWORD: ${REGISTRATION_DB_PASSWORD:?Defina REGISTRATION_DB_PASSWORD no .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payments:
+    <<: *app
+    build: ./services/payments
+    healthcheck: *node-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: payment_user
+      PGDATABASE: payment_db
+      PGPASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD no .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notifications:
+    <<: *app
+    build: ./services/notifications
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: notification_user
+      PGDATABASE: notification_db
+      PGPASSWORD: ${NOTIFICATION_DB_PASSWORD:?Defina NOTIFICATION_DB_PASSWORD no .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    <<: *app
+    image: postgres:17
+    environment:
+      POSTGRES_USER: eventhub_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Defina IDENTITY_DB_PASSWORD no .env}
+      EVENT_DB_PASSWORD: ${EVENT_DB_PASSWORD:?Defina EVENT_DB_PASSWORD no .env}
+      REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:?Defina REGISTRATION_DB_PASSWORD no .env}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD no .env}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Defina NOTIFICATION_DB_PASSWORD no .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/db/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U eventhub_admin -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  rabbitmq:
+    <<: *app
+    image: rabbitmq:4-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Defina RABBITMQ_USER no .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Defina RABBITMQ_PASSWORD no .env}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
