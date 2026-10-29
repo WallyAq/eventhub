@@ -52,6 +52,7 @@ services:
     healthcheck: *node-health
     environment:
       PORT: "3000"
+      JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Execute node scripts/init-identity-keys.mjs}
       IDENTITY_URL: http://identity:3000
       EVENTS_URL: http://events:8000
       REGISTRATIONS_URL: http://registrations:8000
@@ -68,6 +69,8 @@ services:
       PGUSER: identity_user
       PGDATABASE: identity_db
       PGPASSWORD: ${IDENTITY_DB_PASSWORD:?Defina IDENTITY_DB_PASSWORD no .env}
+      JWT_PRIVATE_KEY_BASE64: ${JWT_PRIVATE_KEY_BASE64:?Execute node scripts/init-identity-keys.mjs}
+      JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Execute node scripts/init-identity-keys.mjs}
     depends_on:
       postgres:
         condition: service_healthy

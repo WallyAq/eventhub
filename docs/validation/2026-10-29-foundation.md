@@ -24,3 +24,11 @@ Não houve inspeção visual em navegador: nenhum navegador estava disponível n
 Não há ainda funcionalidades de negócio, autenticação, testes de concorrência de reservas ou publicação/consumo de mensagens. O teste de Notification nesta entrega verifica apenas isolamento da indisponibilidade e recuperação da aplicação; não comprova entrega de notificações nem RN05.
 
 Os comandos reproduzíveis estão no README.
+
+## Validação após reorganização interna
+
+As aplicações foram separadas em módulos de composição, rotas de diagnóstico, banco e observabilidade. No React, a página foi extraída da entrada para pages/EnvironmentPage.tsx e App.tsx passou a compor a aplicação.
+
+Os três testes unitários Node e os três testes de integração passaram após a reorganização. O build de produção TypeScript/Vite foi concluído no Docker e os dez containers ficaram saudáveis. A sintaxe de todos os módulos Python foi verificada; os testes de integração exercitaram seus imports, registro de rotas e acesso ao banco.
+
+Endpoints, nomes de serviços e propriedade dos bancos foram preservados. Não foi realizada nova inspeção visual nesta refatoração.

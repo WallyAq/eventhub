@@ -35,5 +35,5 @@ GET /ready → 200, `{"service":"events","status":"ready","database":"ok"}`, ou 
 
 Os nomes variam conforme a aplicação. Todos respondem com X-Request-ID; chamadas de diagnóstico são rastreáveis nos logs. Rotas inexistentes retornam 404.
 
-Não há endpoints de negócio nesta versão. Os contratos de identidade, eventos, inscrições, pagamentos e mensagens serão definidos incrementalmente.
+Os endpoints de negócio de identidade estão documentados em [identity.md](identity.md). Eventos, inscrições, pagamentos e mensagens serão definidos incrementalmente.
 

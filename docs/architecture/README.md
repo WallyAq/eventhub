@@ -14,7 +14,7 @@ Acesso externo planejado: Internet → Cloudflare Tunnel no host → Nginx.
 
 O Gateway usa Node.js/Express e não possui banco. Somente Nginx publica porta no host. Um PostgreSQL mantém cinco bancos lógicos, sem isolamento físico. Cada usuário é proprietário de seu banco; CONNECT público é revogado nos cinco bancos de serviço. O administrador é usado apenas na infraestrutura.
 
-RabbitMQ está provisionado com volume e healthcheck; publicação e consumo serão implementados na etapa de eventos assíncronos. Não há tabelas de negócio nem migrações ainda.
+RabbitMQ está provisionado com volume e healthcheck; publicação e consumo serão implementados na etapa de eventos assíncronos. Identity possui users, organizations e organization_members, com migrações versionadas no próprio serviço. Os demais serviços ainda possuem somente diagnóstico.
 
 Os logs das aplicações incluem serviço, método, caminho, status, duração e requestId. O Nginx cria o identificador e o Gateway o repassa às consultas internas. Não são registrados corpos, senhas ou tokens.
 
@@ -30,5 +30,5 @@ Esses três serviços não possuem containers ou bancos nesta etapa. A implement
 
 Event possui a capacidade configurada. Registration deverá manter reservas e ocupação transacionalmente; não usará contagem de disponibilidade no frontend para decidir reservas. A sincronização de alterações de capacidade precisa de contrato antes da implementação.
 
-JWT e permissões de domínio ainda não estão implementados. O Gateway expõe apenas diagnóstico nesta entrega.
+Identity emite JWT RS256 para participantes. Gateway e Identity validam assinatura e claims; /users/me usa o sujeito autenticado. A chave privada fica apenas no Identity. Há cadastro/login públicos, perfil protegido e organizações com vínculos OWNER/ORGANIZER consultados no banco por operação. O vínculo não altera o papel global do JWT. A autorização de eventos será implementada no domínio Event, consumindo informações por API.
 

@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { authenticate } from '../middleware/authenticate.js';
+
+export function createOrganizationRouter(service, tokens) {
+  const router = Router();
+  router.use('/organizations', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, authenticate(tokens));
+  router.get('/organizations', async (req, res) => res.json({ organizations: await service.list(req.identity.sub) }));
+  router.post('/organizations', async (req, res) => res.status(201).json({ organization: await service.create(req.identity.sub, req.body) }));
+  router.get('/organizations/:id', async (req, res) => res.json({ organization: await service.get(req.params.id, req.identity.sub) }));
+  router.patch('/organizations/:id', async (req, res) => res.json({ organization: await service.update(req.params.id, req.identity.sub, req.body) }));
+  router.get('/organizations/:id/members', async (req, res) => res.json({ members: await service.members(req.params.id, req.identity.sub) }));
+  router.post('/organizations/:id/members', async (req, res) => res.status(201).json({ member: await service.addMember(req.params.id, req.identity.sub, req.body) }));
+  return router;
+}
