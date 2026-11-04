@@ -8,7 +8,7 @@ export function errors(error, req, res, _next) {
     status = 400; code = 'invalid_json'; message = 'JSON inválido.';
   } else if (error.type === 'entity.too.large') {
     status = 413; code = 'payload_too_large'; message = 'Requisição muito grande.';
-  } else if (['ECONNREFUSED', 'ETIMEDOUT', '57P01', '57P03', '53300', '08006'].includes(error.code)
+  } else if (['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EHOSTUNREACH', 'ETIMEDOUT', '57P01', '57P03', '53300', '08006', 'session_store_unavailable'].includes(error.code)
       || /timeout|connection terminated/i.test(error.message || '')) {
     status = 503; code = 'dependency_unavailable'; message = 'Serviço temporariamente indisponível.';
   }

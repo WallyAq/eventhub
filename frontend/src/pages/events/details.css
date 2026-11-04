@@ -34,6 +34,8 @@
 .participant-details__activity-actions{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:auto}
 .participant-details__activity-actions>strong{font-size:18px;line-height:26px}
 .participant-details__activity-actions>.primary-button{max-width:100%;min-width:0;padding:10px 16px}
+.participant-details__activity-actions>.existing-registration-notice{flex:1;max-width:320px}
+.participant-details__registration-loading{font-size:13px;line-height:21px;color:var(--muted)}
 .participant-details__speakers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .participant-details__speaker{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;min-width:0}
 .participant-details__speaker p{font-size:14px;line-height:24px;color:#464555;overflow-wrap:anywhere;margin:8px 0 0}

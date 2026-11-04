@@ -4,13 +4,17 @@ import threading
 import time
 import urllib.request
 import urllib.error
+import csv
+import io
+import secrets
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from typing import Literal
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
 router = APIRouter()
@@ -30,7 +34,9 @@ def remote(service, path, authorization="", body=None):
 def actor(token): return remote("IDENTITY", "/users/me", token)["user"]
 
 def secured(request):
-    if request.headers.get("x-internal-key") != os.environ["INTERNAL_API_KEY"]: raise HTTPException(401, "Credencial interna inválida.")
+    expected = os.environ.get("INTERNAL_API_KEY", "")
+    if not expected or not secrets.compare_digest(request.headers.get("x-internal-key", ""), expected):
+        raise HTTPException(401, "Credencial interna inválida.")
 
 def migrate():
     with db() as conn:
@@ -41,6 +47,8 @@ def migrate():
           price_cents int NOT NULL CHECK(price_cents>=0), expires_at timestamptz, snapshot jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id,request_key));
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_registration ON registrations(user_id,activity_id) WHERE status IN ('PENDING_PAYMENT','CONFIRMED','WAITLISTED');
         CREATE TABLE IF NOT EXISTS outbox(id uuid PRIMARY KEY, payload jsonb NOT NULL, published_at timestamptz);
+        CREATE TABLE IF NOT EXISTS registration_actions(id uuid PRIMARY KEY,registration_id uuid NOT NULL REFERENCES registrations(id),
+          actor_id uuid NOT NULL,action text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
         """)
 
 def event_message(conn, row, kind):
@@ -165,6 +173,8 @@ def cancel(id:UUID,authorization: str=Header(default="")):
         row=owned(conn,id,user["id"])
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         inventory=lock(conn,row["activity_id"])
+        row=owned(conn,id,user["id"])
+        require_cancellable(row,event)
         updated=conn.execute("UPDATE registrations SET status='CANCELLED' WHERE id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT','WAITLISTED') RETURNING *",(id,)).fetchone()
         if updated: event_message(conn,updated,"registration.cancelled")
         maintain(conn,inventory,event)
@@ -177,6 +187,125 @@ def internal_detail(id:UUID,request:Request):
         row=conn.execute("SELECT * FROM registrations WHERE id=%s",(id,)).fetchone()
         if not row: raise HTTPException(404,"Inscrição não encontrada.")
         return {"registration":serialize(row)}
+
+
+RegistrationStatus = Literal["PENDING_PAYMENT", "CONFIRMED", "CANCELLED", "EXPIRED", "WAITLISTED"]
+
+
+def require_cancellable(row, event):
+    """Completed/ongoing attendance cannot be invalidated by cancelling a ticket."""
+    # Unpaid reservations and waitlisted users have no attendance/certificate to
+    # preserve and must still be able to leave after the activity has started.
+    if row["status"] != "CONFIRMED":
+        return
+    starts_at = row["snapshot"]["activity"].get("startsAt", event["startsAt"])
+    if datetime.fromisoformat(starts_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+        raise HTTPException(409, "A inscrição só pode ser cancelada antes do início da atividade.")
+
+
+def managed_event(event_id, authorization):
+    # managed=true always verifies organization membership in Event, even with a service key.
+    return remote("EVENTS", "/events/" + str(event_id) + "?managed=true", authorization)["event"]
+
+
+def registration_filter(event, status=None, activity_id=None):
+    clauses = ["i.event_id=%s"]
+    values = [event["id"]]
+    if status:
+        clauses.append("r.status=%s")
+        values.append(status)
+    if activity_id:
+        if not any(item["id"] == str(activity_id) for item in event["activities"]):
+            raise HTTPException(404, "Atividade não encontrada neste evento.")
+        clauses.append("r.activity_id=%s")
+        values.append(activity_id)
+    return " AND ".join(clauses), values
+
+
+def event_registrations(event, limit, offset, status=None, activity_id=None, ascending=False):
+    where, values = registration_filter(event, status, activity_id)
+    with db() as conn:
+        # One read transaction keeps the count and page on a consistent snapshot.
+        conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        total = conn.execute("SELECT count(*) AS n FROM registrations r JOIN inventories i ON i.activity_id=r.activity_id WHERE " + where, values).fetchone()["n"]
+        order = "ASC" if ascending else "DESC"
+        rows = conn.execute("SELECT r.* FROM registrations r JOIN inventories i ON i.activity_id=r.activity_id WHERE " + where + " ORDER BY r.created_at " + order + ",r.id LIMIT %s OFFSET %s", [*values, limit, offset]).fetchall()
+    return rows, total
+
+
+def participant_details(rows):
+    users = {}
+    result = []
+    for row in rows:
+        user_id = str(row["user_id"])
+        if user_id not in users:
+            user = remote("IDENTITY", "/internal/users/" + user_id)["user"]
+            users[user_id] = {"id": user_id, "name": user["name"], "email": user["email"]}
+        result.append({**serialize(row), "participant": users[user_id]})
+    return result
+
+
+@router.get("/organizer/events/{id}/registrations")
+def organizer_listing(id: UUID, authorization: str = Header(default=""),
+                      page: int = Query(default=1, ge=1, le=100000),
+                      limit: int = Query(default=25, ge=1, le=100),
+                      status: RegistrationStatus | None = None, activityId: UUID | None = None):
+    event = managed_event(id, authorization)
+    rows, total = event_registrations(event, limit, (page - 1) * limit, status, activityId)
+    return {"registrations": participant_details(rows), "total": total, "page": page, "limit": limit}
+
+
+def safe_csv(value):
+    """Treat spreadsheet formulas as text, including whitespace-prefixed payloads."""
+    value = "" if value is None else str(value)
+    return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n")) else value
+
+
+@router.get("/organizer/events/{id}/registrations/export.csv")
+def organizer_export(id: UUID, authorization: str = Header(default=""),
+                     status: RegistrationStatus | None = None, activityId: UUID | None = None):
+    event = managed_event(id, authorization)
+    rows, total = event_registrations(event, 10001, 0, status, activityId)
+    if total > 10000:
+        raise HTTPException(409, "A exportação aceita até 10000 inscrições. Use os filtros por atividade e status.")
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Inscrição", "Nome", "E-mail", "Atividade", "Status", "Valor (centavos)", "Criada em"])
+    for item in participant_details(rows):
+        writer.writerow([safe_csv(value) for value in [item["id"], item["participant"]["name"], item["participant"]["email"], item["activity"]["title"], item["status"], item["priceCents"], item["createdAt"]]])
+    return Response(content="\ufeff" + output.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="inscricoes-' + str(id) + '.csv"', "Cache-Control": "no-store"})
+
+
+@router.post("/organizer/registrations/{id}/cancel")
+def organizer_cancel(id: UUID, authorization: str = Header(default="")):
+    user = actor(authorization)
+    with db() as conn:
+        row = conn.execute("SELECT * FROM registrations WHERE id=%s", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Inscrição não encontrada.")
+        event = managed_event(row["snapshot"]["eventId"], authorization)
+        inventory = lock(conn, row["activity_id"])
+        # Read again after the inventory lock to serialize cancellation/payment/promotion.
+        row = conn.execute("SELECT * FROM registrations WHERE id=%s", (id,)).fetchone()
+        require_cancellable(row, event)
+        updated = conn.execute("UPDATE registrations SET status='CANCELLED' WHERE id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT','WAITLISTED') RETURNING *", (id,)).fetchone()
+        if updated:
+            event_message(conn, updated, "registration.cancelled")
+            conn.execute("INSERT INTO registration_actions(id,registration_id,actor_id,action) VALUES(%s,%s,%s,'organizer.cancelled')", (str(uuid4()), id, user["id"]))
+            row = updated
+        maintain(conn, inventory, event)
+        return {"registration": serialize(row)}
+
+
+@router.get("/internal/events/{id}/registrations")
+def internal_event_registrations(id: UUID, request: Request,
+                                limit: int = Query(default=500, ge=1, le=500),
+                                offset: int = Query(default=0, ge=0, le=1000000)):
+    secured(request)
+    event = remote("EVENTS", "/events/" + str(id))["event"]
+    rows, total = event_registrations(event, limit, offset, ascending=True)
+    return {"registrations": [serialize(row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
 class Decision(BaseModel):
     model_config=ConfigDict(extra="forbid")

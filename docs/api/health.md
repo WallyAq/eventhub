@@ -20,7 +20,10 @@ Consulta /ready de cada aplicação usando DNS interno Docker, com timeout de 3 
     {"name": "events", "status": "ready"},
     {"name": "registrations", "status": "ready"},
     {"name": "payments", "status": "ready"},
-    {"name": "notifications", "status": "unavailable"}
+    {"name": "notifications", "status": "unavailable"},
+    {"name": "attendance", "status": "ready"},
+    {"name": "certificates", "status": "ready"},
+    {"name": "reporting", "status": "ready"}
   ]
 }
 ```
@@ -35,5 +38,5 @@ GET /ready → 200, `{"service":"events","status":"ready","database":"ok"}`, ou 
 
 Os nomes variam conforme a aplicação. Todos respondem com X-Request-ID; chamadas de diagnóstico são rastreáveis nos logs. Rotas inexistentes retornam 404.
 
-Os endpoints de negócio de identidade estão documentados em [identity.md](identity.md). Eventos, inscrições, pagamentos e mensagens serão definidos incrementalmente.
+Oito serviços participam do diagnóstico. A prontidão não prova entrega de SMTP/RabbitMQ nem substitui os testes de autorização, concorrência, presença e emissão. Consulte [Identity](identity.md), [negócio](business.md), [presença](attendance.md), [certificados](certificates.md) e [relatórios](reporting.md).
 

@@ -61,6 +61,7 @@ export async function participantFixture(page: Page, options: {
     const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (path === '/status') return reply({ status: 'ready' });
     if (path === '/users/me' && method === 'GET') return reply({ user: participant });
+    if (path === '/auth/logout' && method === 'POST') return route.fulfill({ status: 204 });
     if (path === '/events' && method === 'GET') return reply({ events: state.events });
     const availabilityMatch = path.match(/^\/events\/([^/]+)\/availability$/);
     if (availabilityMatch && method === 'GET') {

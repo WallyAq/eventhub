@@ -10,5 +10,9 @@ export function createOrganizationRouter(service, tokens) {
   router.patch('/organizations/:id', async (req, res) => res.json({ organization: await service.update(req.params.id, req.identity.sub, req.body) }));
   router.get('/organizations/:id/members', async (req, res) => res.json({ members: await service.members(req.params.id, req.identity.sub) }));
   router.post('/organizations/:id/members', async (req, res) => res.status(201).json({ member: await service.addMember(req.params.id, req.identity.sub, req.body) }));
+  router.delete('/organizations/:id/members/:userId', async (req, res) => {
+    await service.removeMember(req.params.id, req.identity.sub, req.params.userId);
+    res.sendStatus(204);
+  });
   return router;
 }

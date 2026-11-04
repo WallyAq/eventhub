@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-const publicColumns = 'id, name, email, role, cpf, phone, marketing_opt_in AS "marketingOptIn", created_at AS "createdAt", updated_at AS "updatedAt"';
+const publicColumns = 'id, name, email, email_verified_at AS "emailVerifiedAt", role, cpf, phone, marketing_opt_in AS "marketingOptIn", created_at AS "createdAt", updated_at AS "updatedAt"';
 
 export function createUserRepository(pool) {
   return {
@@ -25,7 +25,7 @@ export function createUserRepository(pool) {
     },
     async findCredentials(email) {
       const { rows } = await pool.query(
-        `SELECT ${publicColumns}, password_hash AS "passwordHash" FROM users WHERE email = $1`, [email],
+        `SELECT ${publicColumns}, password_hash AS "passwordHash", credentials_version AS "credentialsVersion" FROM users WHERE email = $1`, [email],
       );
       return rows[0];
     },
@@ -39,7 +39,18 @@ export function createUserRepository(pool) {
       )).rows[0];
     },
     async changePassword(id, oldHash, newHash) {
-      return (await pool.query('UPDATE users SET password_hash=$3,updated_at=now() WHERE id=$1 AND password_hash=$2', [id,oldHash,newHash])).rowCount === 1;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const changed = (await client.query('UPDATE users SET password_hash=$3,credentials_version=credentials_version+1,updated_at=now() WHERE id=$1 AND password_hash=$2', [id,oldHash,newHash])).rowCount === 1;
+        if (changed) {
+          await client.query('DELETE FROM password_resets WHERE user_id=$1', [id]);
+          await client.query('DELETE FROM email_changes WHERE user_id=$1', [id]);
+        }
+        await client.query('COMMIT');
+        return changed;
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
     },
   };
 }

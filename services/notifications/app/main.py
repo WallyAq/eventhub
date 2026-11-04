@@ -5,11 +5,13 @@ from .observability import request_logging
 from contextlib import asynccontextmanager
 from threading import Event, Thread
 from .consumer import migrate, consume
+from .delivery import Delivery
 
 @asynccontextmanager
 async def lifespan(app):
     migrate()
-    stop=Event(); thread=Thread(target=consume,args=(stop,),daemon=True); thread.start()
+    delivery=Delivery()
+    stop=Event(); thread=Thread(target=consume,args=(stop,delivery),daemon=True); thread.start()
     yield
     stop.set(); thread.join(timeout=6)
 

@@ -1,6 +1,6 @@
 # Organização do repositório
 
-A estrutura externa foi mantida: frontend, Gateway, cinco serviços independentes, infraestrutura e testes de integração. A reorganização interna separa composição da aplicação, transporte HTTP, observabilidade e conexão ao banco. Não altera endpoints, nomes DNS, bancos, portas ou contratos existentes.
+A estrutura externa inclui frontend, Gateway, oito serviços independentes, infraestrutura e testes de integração. Composição da aplicação, transporte HTTP, observabilidade e conexão ao banco ficam no domínio proprietário. Os novos serviços Attendance, Certificate e Reporting preservam as rotas e os contratos anteriores e adicionam APIs explícitas.
 
 ## Frontend
 
@@ -42,7 +42,7 @@ O perfil institucional mantém consulta e edição na mesma página em pages/org
 
 ManagePage diferencia a organização sem eventos de uma busca sem resultados. O convite para criar a primeira programação usa a rota do editor existente; os filtros continuam operando sobre os eventos que o usuário pode administrar.
 
-O [fluxo do participante](../validation/2026-11-03-participant.md) mantém catálogo em pages/events e inscrições/checkout em pages/registrations. As quatro etapas reutilizam as APIs de Event, Registration e Payment; os respectivos estilos ficam em catalog.css, my-registrations.css e checkout.css. O comprovante representa uma inscrição confirmada e não antecipa a implementação de presença ou certificados.
+O [fluxo do participante](../validation/2026-11-03-participant.md) mantém catálogo em pages/events e inscrições/checkout em pages/registrations. As quatro etapas reutilizam Event, Registration e Payment. O comprovante representa a inscrição; o botão de certificado chama Certificate e baixa um PDF após os requisitos serem validados no servidor. services/eventRegistrations.ts compartilha a consulta antecipada de inscrição existente entre detalhes e checkout.
 
 As [referências complementares de 04/11](../validation/2026-11-04-participant.md) acrescentam details.css e participant-profile.css. AppLayout compartilha o rodapé participante; Brand usa a imagem com canal alpha em public/figma. A separação de inscrições em abas é uma projeção dos estados e datas recebidos, sem novos estados no Registration. A consulta e edição de perfil continuam utilizando o contrato Identity existente.
 
@@ -59,7 +59,7 @@ gateway/src/
   routes/health.js               Diagnóstico local e das dependências
 ```
 
-routes/identity.js encaminha endpoints de identidade e organizações. routes/business.js encaminha rotas explícitas de Event, Registration e Payment; não publica callbacks internos. security/tokens.js valida JWT com chave pública. O Gateway não é proprietário das regras de inscrição ou pagamento.
+routes/identity.js encaminha identidade e organizações. routes/business.js encaminha rotas explícitas dos domínios, incluindo downloads PDF/CSV; não publica callbacks internos. security/tokens.js valida JWT com chave pública e security/sessions.js consulta revogação no Identity. O Gateway não é proprietário das regras de negócio e distingue sessão inválida de dependência indisponível.
 
 ## Identity e Payment
 
@@ -92,15 +92,15 @@ O comando Uvicorn usa app.main:app. Event e Registration mantêm regras, modelos
 
 ## Infraestrutura, testes e documentação
 
-- infra/db inicializa bancos e permissões em um volume novo; não substitui migrações de tabelas.
-- infra/nginx concentra o acesso HTTP. O Compose mantém a topologia existente de dez containers.
+- infra/db inicializa bancos e permissões; scripts/provision-backend-databases.mjs permite adicionar domínios a um volume existente sem apagar dados ou trocar senhas. Não substitui migrações de tabelas.
+- infra/nginx concentra o acesso HTTP. O Compose mantém treze contêineres, oito deles aplicações de domínio com bancos próprios.
 - Testes unitários Node permanecem junto ao serviço. tests/integration verifica contratos e comunicação entre aplicações.
 - docs/api guarda contratos; docs/adr registra decisões; docs/validation guarda evidências.
 
-Identity já inclui database/migrations, database/migrate.js, security (hash e JWT), users e organizations (repositórios e regras), routes/users.js, routes/organizations.js e middlewares de autenticação/erros. As migrações dos demais serviços serão introduzidas com suas primeiras tabelas. Não foram criados diretórios vazios de entidades, repositórios, mensageria ou serviços ainda não implementados.
+Identity inclui migrações versionadas, security/sessions.js, users/email.js, mail/ e rotas de sessão/e-mail/organização. Notification separa o consumidor de RabbitMQ do transporte em app/delivery.py. Os demais serviços criam suas próprias tabelas com bloqueio de migração. services/attendance mantém presença e autorização em app/domain.py; services/certificates separa regras e geração de PDF; services/reporting separa projeção/reconciliação do consumidor. Cada pasta tem Dockerfile, dependências e testes.
 
 ## Avaliação e próximos passos
 
-A divisão externa é adequada ao protótipo de cinco serviços e duas stacks. Separar arquivos internos facilita manutenção sem introduzir pacotes compartilhados ou novos frameworks. Essa organização, por si só, não implementa requisitos funcionais ou garante consistência distribuída.
+A divisão externa mantém oito serviços e duas stacks, sem importar código-fonte nem acessar SQL de outros domínios. Consistência distribuída é tratada por regras no proprietário, outbox, deduplicação, reconciliação e revalidação de elegibilidade.
 
-Identity possui contas, organizações e recuperação. Event, Registration e Payment implementam o fluxo de evento/reserva/pagamento; Notification consome RabbitMQ. Os ADRs 004/005 documentam capacidade, conciliação e outbox. Attendance, Certificate e Reporting continuam modelados para evolução.
+Os ADRs 004/005 documentam capacidade, conciliação e outbox. Attendance, Certificate e Reporting estão implementados; telas organizadoras dessas APIs e confirmação visual de e-mail continuam como integração de frontend posterior. Pagamento real, CI, backups e preparação para operação pública não fazem parte da afirmação de backend acadêmico implementado.

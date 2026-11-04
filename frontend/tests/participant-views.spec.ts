@@ -137,7 +137,8 @@ test('registration tabs distinguish ended confirmed activities from pending, wai
   await expect(page.getByRole('tab', { name: /Cursos Concluídos/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.my-registration-card')).toHaveCount(1);
   await expect(page.locator('.my-registration-activity')).toContainText(completed.activity.title);
-  await expect(page.getByRole('button', { name: 'Baixar Certificado (PDF)', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Baixar Certificado (PDF)', exact: true })).toBeEnabled();
+  await expect(page.getByText('Certificados exigem inscrição confirmada, presença registrada e atividade concluída.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ver Programação', exact: true })).toHaveAttribute('href', '/eventos/' + completed.eventId + '#atividades');
   await expect(page.getByRole('button', { name: 'Cancelar inscrição', exact: true })).toHaveCount(0);
   await captureParticipant(page, info, 'my-registrations-completed');

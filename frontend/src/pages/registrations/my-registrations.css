@@ -51,6 +51,7 @@
 .my-registration-completed .my-registration-meta{margin-bottom:16px}
 .my-registration-completed .my-registration-activity{background:#f9f9ff;border-color:#e1e3ed}
 .my-registrations .my-registration-side>button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.my-registration-certificate-message{font-size:12px;line-height:19px;margin:0;overflow-wrap:anywhere}
 .my-registration-notice{padding:12px 16px;background:#e9f8ed;border:1px solid #cce8d3;border-radius:6px;margin:0 0 20px}
 .my-registrations-empty{background:white;border-style:solid}
 .my-registrations .my-registrations-empty h2{font-size:22px;line-height:30px;margin-bottom:8px}

@@ -87,14 +87,16 @@ test('duplicate enrollment is blocked and shows the existing registration', asyn
   await page.goto('/eventos/' + participantEvent.id + '/inscricao');
   const dialog = page.getByRole('dialog', { name: 'Inscrição na Atividade', exact: true });
   await dialog.getByRole('radio', { name: freeActivity.title, exact: true }).check();
-  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Confirmar e Continuar', exact: true }).click();
+  await expect(dialog.getByText('Você já está inscrito nesta atividade.', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Nome Completo', { exact: true })).toHaveCount(0);
+  expect(state.posts).toHaveLength(0);
+  await dialog.getByRole('button', { name: 'Ver comprovante', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/pagamento/' + registration.id + '$'));
-  await expect(dialog.getByText('Você já está inscrito nesta atividade. Não é possível fazer outra inscrição enquanto ela estiver ativa.', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Você já está inscrito nesta atividade.', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Você já está inscrito nesta atividade', exact: true })).toBeVisible();
   expect(state.registrations).toHaveLength(1);
   expect(state.registrations[0].id).toBe(registration.id);
-  expect(state.posts.filter(post => post.path === '/registrations')).toHaveLength(1);
+  expect(state.posts.filter(post => post.path === '/registrations')).toHaveLength(0);
   expect(state.unexpected).toEqual([]);
 });
 

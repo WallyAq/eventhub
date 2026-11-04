@@ -43,5 +43,25 @@ export function createOrganizationRepository(pool) {
         RETURNING user_id AS id,role,created_at AS "createdAt"`, [id, userId, email]);
       return rows[0];
     },
+    async removeMember(id, actorId, memberId) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // Serialize membership removals and recheck authorization in the same
+        // transaction; a removed organizer never retains management access.
+        await client.query('SELECT id FROM organizations WHERE id=$1 FOR UPDATE', [id]);
+        const actor = (await client.query('SELECT role FROM organization_members WHERE organization_id=$1 AND user_id=$2', [id, actorId])).rows[0];
+        if (actor?.role !== 'OWNER') { await client.query('ROLLBACK'); return 'FORBIDDEN'; }
+        const target = (await client.query('SELECT role FROM organization_members WHERE organization_id=$1 AND user_id=$2 FOR UPDATE', [id, memberId])).rows[0];
+        if (!target) { await client.query('ROLLBACK'); return 'NOT_FOUND'; }
+        // OWNER removal/transfer is intentionally a separate operation. The
+        // existing unique owner index and this guard preserve the owner.
+        if (target.role === 'OWNER') { await client.query('ROLLBACK'); return 'OWNER_PROTECTED'; }
+        await client.query("DELETE FROM organization_members WHERE organization_id=$1 AND user_id=$2 AND role='ORGANIZER'", [id, memberId]);
+        await client.query('COMMIT');
+        return 'REMOVED';
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
+    },
   };
 }

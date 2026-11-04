@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { BusinessLayout, Feedback, Icon } from '../../components/Business';
 import { api, useData, date, money, statusLabel } from '../../services/business';
@@ -42,15 +42,37 @@ function pageNumbers(current: number, pages: number) {
   const nearby = current <= 3 ? [1, 2, 3] : current >= pages - 2 ? [pages - 2, pages - 1, pages] : [current - 1, current, current + 1];
   return [...new Set([1, ...nearby, pages])].sort((left, right) => left - right);
 }
+async function certificateError(response: Response): Promise<Error> {
+  const body = await response.json().catch(() => null);
+  const detail = body && typeof body === 'object' ? body.detail : null;
+  const code = detail && typeof detail === 'object' ? detail.code : '';
+  if (response.status === 409) {
+    if (code === 'ATTENDANCE_REQUIRED') return new Error('Sua presença nesta atividade ainda não foi registrada. Solicite o credenciamento à organização para liberar o certificado.');
+    if (code === 'ACTIVITY_NOT_FINISHED') return new Error('O certificado ficará disponível após o término da atividade.');
+    if (code === 'EVENT_NOT_PUBLISHED' || code === 'REGISTRATION_NOT_CONFIRMED') return new Error('O certificado não está disponível no estado atual da inscrição ou do evento. Consulte a organização.');
+    return new Error('Não foi possível validar os requisitos do certificado. Confirme sua presença com a organização e tente novamente.');
+  }
+  if (response.status === 503) return new Error('O serviço de certificados está temporariamente indisponível. Tente novamente.');
+  if (response.status === 401 || response.status === 403) return new Error('Não foi possível autorizar o acesso ao certificado. Verifique sua sessão e tente novamente.');
+  return new Error(typeof detail === 'string' ? detail : 'Não foi possível preparar o certificado. Tente novamente.');
+}
 
 export function MyRegistrationsPage() {
   const { session } = useAuth();
+  const location = useLocation();
   const { data, error, loading, reload } = useData<{ registrations: Registration[] }>('/registrations');
   const [query, setQuery] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1);
   const [tab, setTab] = useState<RegistrationTab>('active'), [now, setNow] = useState(Date.now());
   const [saved, setSaved] = useState<Record<string, Registration>>({});
   const [cancelTarget, setCancelTarget] = useState<Registration | null>(null), [busy, setBusy] = useState(false);
   const [cancelError, setCancelError] = useState(''), [notice, setNotice] = useState('');
+  const [certificateBusyId, setCertificateBusyId] = useState('');
+  const [certificateMessages, setCertificateMessages] = useState<Record<string, { error: boolean; text: string }>>({});
+  const certificateIds = useRef<Record<string, string>>({});
+  const certificateRequest = useRef<{ scope: string; controller: AbortController } | null>(null);
+  const certificateScope = (session?.token || '') + ':' + location.key;
+  const currentCertificateScope = useRef(certificateScope); currentCertificateScope.current = certificateScope;
+  const certificateMounted = useRef(true);
   const dialog = useRef<HTMLDialogElement>(null), lastFocused = useRef<HTMLElement | null>(null), inFlight = useRef(false);
   const tabButtons = useRef<Partial<Record<RegistrationTab, HTMLButtonElement | null>>>({});
   const reloadRef = useRef(reload); reloadRef.current = reload;
@@ -59,6 +81,18 @@ export function MyRegistrationsPage() {
   const shouldPoll = hasPending || registrations.some(item => item.status === 'WAITLISTED');
   const nextActivityEnd = Math.min(...registrations.filter(item => item.status === 'CONFIRMED').map(item => new Date(item.activity.endsAt).getTime()).filter(ends => ends > now));
 
+  useEffect(() => {
+    certificateMounted.current = true;
+    return () => { certificateMounted.current = false; certificateRequest.current?.controller.abort(); };
+  }, []);
+  useEffect(() => {
+    certificateIds.current = {}; setCertificateBusyId(''); setCertificateMessages({});
+    return () => {
+      if (certificateRequest.current?.scope === certificateScope) {
+        certificateRequest.current.controller.abort(); certificateRequest.current = null;
+      }
+    };
+  }, [certificateScope]);
   useEffect(() => {
     if (!hasPending) return;
     setNow(Date.now());
@@ -109,6 +143,51 @@ export function MyRegistrationsPage() {
     } catch (error) { setCancelError(errorMessage(error)); }
     finally { inFlight.current = false; setBusy(false); }
   }
+  async function downloadCertificate(item: Registration) {
+    if (!session || item.userId !== session.user.id || item.status !== 'CONFIRMED' || tabFor(item, Date.now()) !== 'completed') return;
+    if (certificateRequest.current?.scope === certificateScope) return;
+    certificateRequest.current?.controller.abort();
+    const operation = { scope: certificateScope, controller: new AbortController() };
+    certificateRequest.current = operation;
+    const isCurrent = () => certificateMounted.current && currentCertificateScope.current === operation.scope && certificateRequest.current === operation;
+    const signal = AbortSignal.any([operation.controller.signal, AbortSignal.timeout(20000)]);
+    const headers = { authorization: 'Bearer ' + session.token };
+    setCertificateBusyId(item.id);
+    setCertificateMessages(previous => { const next = { ...previous }; delete next[item.id]; return next; });
+    try {
+      let id = certificateIds.current[item.id];
+      if (!id) {
+        const response = await fetch('/api/certificates', { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ registrationId: item.id }), signal, cache: 'no-store' });
+        if (!response.ok) throw await certificateError(response);
+        const result = await response.json();
+        if (!isCurrent()) return;
+        if (typeof result?.certificate?.id !== 'string' || !/^[a-f0-9-]{36}$/i.test(result.certificate.id) || result.certificate.registrationId !== item.id) {
+          throw new Error('O serviço retornou um certificado inválido. Tente novamente.');
+        }
+        id = result.certificate.id; certificateIds.current[item.id] = id;
+      }
+      if (!isCurrent()) return;
+      const response = await fetch('/api/certificates/' + encodeURIComponent(id) + '/download', { headers, signal, cache: 'no-store' });
+      if (!response.ok) throw await certificateError(response);
+      const blob = await response.blob();
+      if (!response.headers.get('content-type')?.toLowerCase().startsWith('application/pdf') || await blob.slice(0, 5).text() !== '%PDF-') {
+        throw new Error('O serviço não retornou um PDF válido. Tente novamente.');
+      }
+      if (!isCurrent()) return;
+      const url = URL.createObjectURL(blob), anchor = document.createElement('a');
+      anchor.href = url; anchor.download = 'certificado-' + id + '.pdf';
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCertificateMessages(previous => ({ ...previous, [item.id]: { error: false, text: 'Certificado pronto. O download do PDF foi iniciado.' } }));
+    } catch (error) {
+      if (isCurrent()) setCertificateMessages(previous => ({ ...previous, [item.id]: { error: true,
+        text: error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')
+          ? 'A consulta ao certificado demorou mais que o esperado. Tente novamente.' : errorMessage(error) } }));
+    } finally {
+      if (isCurrent()) { certificateRequest.current = null; setCertificateBusyId(''); }
+    }
+  }
 
   const counts = { active: 0, completed: 0, closed: 0 };
   registrations.forEach(item => { counts[tabFor(item, now)]++; });
@@ -126,7 +205,7 @@ export function MyRegistrationsPage() {
       <div className="my-registration-tabs" role="tablist" aria-label="Tipos de inscrição">{TABS.map((item, index) => <button key={item.id} ref={element => { tabButtons.current[item.id] = element; }} id={'registration-tab-' + item.id} role="tab" type="button" aria-selected={tab === item.id} aria-controls="registrations-panel" tabIndex={tab === item.id ? 0 : -1} onClick={() => changeTab(item.id)} onKeyDown={event => navigateTabs(event, index)}>{item.label}<span>{counts[item.id]}</span></button>)}</div>
       <section key={tab} id="registrations-panel" role="tabpanel" aria-labelledby={'registration-tab-' + tab} tabIndex={0}>
         <div className="filter-bar"><div className="search-field"><Icon file="3f6b7" /><input aria-label="Buscar inscrições" placeholder="Buscar por evento, atividade ou local..." value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></div><select aria-label="Status da inscrição" value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="">Todos os status</option>{TAB_STATUSES[tab].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></div>
-        <div className="my-registration-section-heading"><h2>{sectionTitle}</h2><p>{tab === 'completed' ? 'Atividades cujo período já terminou. Certificados ainda não estão disponíveis.' : tab === 'closed' ? 'Consulte os registros e os detalhes das inscrições encerradas.' : 'Consulte seu comprovante e os detalhes da programação.'}</p></div>
+        <div className="my-registration-section-heading"><h2>{sectionTitle}</h2><p>{tab === 'completed' ? 'Certificados exigem inscrição confirmada, presença registrada e atividade concluída.' : tab === 'closed' ? 'Consulte os registros e os detalhes das inscrições encerradas.' : 'Consulte seu comprovante e os detalhes da programação.'}</p></div>
         <div className="my-registrations-grid">{visible.map(item => {
           const seconds = secondsLeft(item, now), pending = item.status === 'PENDING_PAYMENT', payable = pending && seconds > 0;
           const completed = tab === 'completed', confirmed = item.status === 'CONFIRMED' && !completed;
@@ -141,7 +220,7 @@ export function MyRegistrationsPage() {
               {!completed && <div className="my-registration-actions">{ACTIVE.has(item.status) && <button type="button" className="secondary-button my-registration-cancel" onClick={() => { setCancelError(''); setCancelTarget(item); }}>Cancelar inscrição</button>}<Link className="secondary-button" to={programUrl}>Detalhes da Programação</Link></div>}
             </div>
             <aside className={'my-registration-side' + (confirmed ? ' my-registration-credential' : '')} aria-label={confirmed ? 'Comprovante digital' : 'Ações da inscrição'}>
-              {confirmed ? <><span className="my-registration-credential-label">Comprovante digital</span><span className="my-registration-credential-status">Inscrição confirmada</span><div className="my-registration-credential-id"><small>Identificação da inscrição</small><code>{item.id}</code></div><p className="my-registration-participant"><strong>{session?.user.name}</strong><span>Participante inscrito</span></p><Link className="primary-button" to={'/inscricoes/' + item.id}>Ver ingresso</Link></> : completed ? <><Link className="secondary-button" to={programUrl}>Ver Programação</Link><button type="button" className="primary-button" disabled title="Certificados ainda não estão disponíveis">Baixar Certificado (PDF)</button><Link className="text-button" to={'/inscricoes/' + item.id}>Ver comprovante</Link></> : <Link className={payable ? 'primary-button' : 'secondary-button'} to={(payable ? '/pagamento/' : '/inscricoes/') + item.id}>{payable ? 'Continuar pagamento' : 'Ver inscrição'}</Link>}
+              {confirmed ? <><span className="my-registration-credential-label">Comprovante digital</span><span className="my-registration-credential-status">Inscrição confirmada</span><div className="my-registration-credential-id"><small>Identificação da inscrição</small><code>{item.id}</code></div><p className="my-registration-participant"><strong>{session?.user.name}</strong><span>Participante inscrito</span></p><Link className="primary-button" to={'/inscricoes/' + item.id}>Ver ingresso</Link></> : completed ? <><Link className="secondary-button" to={programUrl}>Ver Programação</Link><button type="button" className="primary-button" disabled={Boolean(certificateBusyId) || item.userId !== session?.user.id} aria-busy={certificateBusyId === item.id} aria-describedby={certificateMessages[item.id] ? 'certificate-message-' + item.id : undefined} onClick={() => downloadCertificate(item)}>{certificateBusyId === item.id ? 'Preparando PDF…' : 'Baixar Certificado (PDF)'}</button>{certificateMessages[item.id] && <p id={'certificate-message-' + item.id} className={'my-registration-certificate-message ' + (certificateMessages[item.id].error ? 'error' : 'success')} role={certificateMessages[item.id].error ? 'alert' : 'status'}>{certificateMessages[item.id].text}</p>}<Link className="text-button" to={'/inscricoes/' + item.id}>Ver comprovante</Link></> : <Link className={payable ? 'primary-button' : 'secondary-button'} to={(payable ? '/pagamento/' : '/inscricoes/') + item.id}>{payable ? 'Continuar pagamento' : 'Ver inscrição'}</Link>}
             </aside>
           </article>;
         })}</div>

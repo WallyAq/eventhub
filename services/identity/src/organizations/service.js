@@ -80,5 +80,14 @@ export function createOrganizationService(repository) {
         throw error;
       }
     },
+    async removeMember(id, userId, memberId) {
+      await access(id, userId, true);
+      if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(memberId))
+        throw new UserError(400, 'invalid_input', 'Identificador de membro inválido.');
+      const result = await repository.removeMember(id, userId, memberId);
+      if (result === 'FORBIDDEN') throw new UserError(403, 'forbidden', 'Apenas o responsável pode realizar esta operação.');
+      if (result === 'OWNER_PROTECTED') throw new UserError(409, 'owner_protected', 'O responsável pela organização não pode ser removido.');
+      if (result !== 'REMOVED') throw new UserError(404, 'member_not_found', 'Membro não encontrado nesta organização.');
+    },
   };
 }

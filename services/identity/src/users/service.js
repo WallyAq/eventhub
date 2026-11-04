@@ -70,11 +70,13 @@ export function createUserService(repository, tokens) {
       fields(body, ['email', 'password']);
       const { email, password } = credentials(body);
       const found = await repository.findCredentials(email);
-      dummyHash ??= hashPassword(randomBytes(32).toString('hex'));
+      // Allocate the deliberately expensive dummy hash only for unknown accounts.
+      // Creating it on every first successful login needlessly doubles scrypt memory.
+      if (!found) dummyHash ??= hashPassword(randomBytes(32).toString('hex'));
       const valid = await verifyPassword(password, found?.passwordHash || await dummyHash);
       if (!found || !valid) throw new UserError(401, 'invalid_credentials', 'E-mail ou senha incorretos.');
-      const { passwordHash, ...user } = found;
-      return { accessToken: await tokens.issue(user), tokenType: 'Bearer', expiresIn: tokens.expiresIn, user };
+      const { passwordHash, credentialsVersion, ...user } = found;
+      return { accessToken: await tokens.issue({ ...user, credentialsVersion }), tokenType: 'Bearer', expiresIn: tokens.expiresIn, user };
     },
     async profile(id) {
       const user = await repository.findById(id);

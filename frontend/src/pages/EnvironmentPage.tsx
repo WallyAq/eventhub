@@ -8,6 +8,7 @@ const labels: Record<string, string> = {
   identity: 'Identidade e acesso', events: 'Eventos e programação',
   registrations: 'Inscrições e reservas', payments: 'Pagamentos',
   notifications: 'Notificações',
+  attendance: 'Presença e check-in', certificates: 'Certificados', reporting: 'Relatórios',
 };
 
 export function EnvironmentPage() {
@@ -30,10 +31,10 @@ export function EnvironmentPage() {
           <span className="eyebrow">CONEXÕES QUE MOVEM O CONHECIMENTO</span>
           <h1>Grandes encontros<br />começam aqui.</h1>
           <p>Um espaço para descobrir eventos, compartilhar ideias e fazer parte de novas experiências acadêmicas e profissionais.</p>
-          <div className="milestone"><span className="step">02</span><div><strong>A plataforma está evoluindo</strong><p>Cadastro e acesso de participantes estão disponíveis. Eventos e inscrições serão as próximas entregas.</p></div></div>
+          <div className="milestone"><span className="step">08</span><div><strong>Oito serviços conectados</strong><p>Contas, eventos, inscrições, pagamentos simulados, notificações, presença, certificados e relatórios.</p></div></div>
         </section>
         <section className="status-panel" aria-labelledby="status-title">
-          <div className="panel-top"><span className="eyebrow">PRIMEIRA ENTREGA</span><span className="tag">Infraestrutura</span></div>
+          <div className="panel-top"><span className="eyebrow">AMBIENTE LOCAL</span><span className="tag">Infraestrutura</span></div>
           <h2 id="status-title">Tudo começa com uma boa base.</h2>
           <p>Conectividade das aplicações e de seus bancos de dados.</p>
           <div aria-live="polite" aria-busy={loading}>
@@ -42,7 +43,7 @@ export function EnvironmentPage() {
             {data?.services.map(service => <div className="service" key={service.name}><span>{labels[service.name] || service.name}</span><span className={'state ' + service.status}><i />{service.status === 'ready' ? 'Disponível' : 'Indisponível'}</span></div>)}
           </div>
           <button onClick={() => void refresh()} disabled={loading}>{loading ? 'Consultando…' : 'Verificar novamente'}<span aria-hidden="true">↗</span></button>
-          <p className="note">Este painel verifica a infraestrutura. As funcionalidades de negócio ainda estão em desenvolvimento.</p>
+          <p className="note">Este painel consulta a prontidão dos bancos. O funcionamento de cada fluxo é validado pelos testes de negócio.</p>
         </section>
       </main>
       <footer><span>EventHub · Projeto acadêmico</span><span>Encontros. Ideias. Possibilidades.</span></footer>

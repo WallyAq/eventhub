@@ -5,6 +5,8 @@ import { useData, date, money } from '../../services/business';
 import type { Activity, EventData } from '../../services/business';
 import { useEventAvailability } from '../../services/availability';
 import { ActivitySeats } from '../../components/events/ActivitySeats';
+import { useEventRegistrations } from '../../services/eventRegistrations';
+import { ExistingRegistrationNotice } from '../../components/events/ExistingRegistrationNotice';
 import './details.css';
 
 function duration(activity: Activity) {
@@ -20,6 +22,7 @@ export function EventDetailsPage() {
   const { data, error, loading } = useData<{ event: EventData }>('/events/' + id);
   const event = data && data.event.id === id ? data.event : null;
   const availability = useEventAvailability(event?.id);
+  const registrations = useEventRegistrations(event?.id);
   const streamUrl = event?.streamUrl && /^https?:\/\//i.test(event.streamUrl) ? event.streamUrl : '';
   useEffect(() => {
     if (event && hash === '#atividades') document.getElementById('atividades')?.scrollIntoView({ block: 'start' });
@@ -53,6 +56,7 @@ export function EventDetailsPage() {
           <h2 id="event-activities-title">Atividades Vinculadas</h2>
           <p className="participant-details__intro">Oficinas, workshops, trilhas e minicursos vinculados a esta edição do evento.</p>
           {availability.failed && <p className="participant-details__availability-error">Não foi possível consultar as vagas agora. <button type="button" className="text-button" onClick={availability.reload}>Atualizar vagas</button></p>}
+          {registrations.failed && <p className="participant-details__availability-error">Não foi possível verificar suas inscrições agora. <button type="button" className="text-button" onClick={registrations.reload}>Atualizar inscrições</button></p>}
           {event.activities.length > 0 ? <div className="participant-details__activities">{event.activities.map(activity => <article className="participant-details__activity" key={activity.id}>
             <h3>{activity.title}</h3>
             {activity.description && <p className="participant-details__description preserve-lines">{activity.description}</p>}
@@ -62,7 +66,7 @@ export function EventDetailsPage() {
               <p><Icon file="e12a2" /><span>Instrutor(a): {activity.responsible || 'Não informado'}</span></p>
               <p className="participant-details__capacity"><ActivitySeats availability={availability.activities.get(activity.id)} loading={availability.loading} /></p>
             </div>
-            <div className="participant-details__activity-actions"><strong>{activity.priceCents ? money(activity.priceCents) : 'Gratuito'}</strong><Link className="primary-button" to={'/atividades/' + event.id + '/' + activity.id + '/inscricao'}>Inscrever-se na atividade</Link></div>
+            <div className="participant-details__activity-actions"><strong>{activity.priceCents ? money(activity.priceCents) : 'Gratuito'}</strong>{registrations.activities.has(activity.id) ? <ExistingRegistrationNotice registration={registrations.activities.get(activity.id)!} /> : registrations.loading ? <span role="status" className="participant-details__registration-loading">Consultando suas inscrições…</span> : <Link className="primary-button" to={'/atividades/' + event.id + '/' + activity.id + '/inscricao'}>Inscrever-se na atividade</Link>}</div>
           </article>)}</div> : <p className="participant-details__empty">Nenhuma atividade disponível neste evento.</p>}
         </section>
 

@@ -32,9 +32,14 @@ test('business rules: ownership, concurrency, payment, expiry, cancellation, out
 
   await t.test('RN01: concurrent last seat, duplicate protection and ordered waitlist promotion',async()=>{
     const results=await Promise.all(Array.from({length:12},(_,i)=>reserve(i%2?a:b,0)));
-    for(const result of results)assert.equal(result.status,201,JSON.stringify(result.body));
-    const unique=[...new Map(results.map(result=>[result.body.registration.id,result.body.registration])).values()];
+    const created=results.filter(result=>result.status===201),duplicates=results.filter(result=>result.status===409);
+    assert.equal(created.length,2,JSON.stringify(results));assert.equal(duplicates.length,10,JSON.stringify(results));
+    for(const result of duplicates)assert.equal(result.body.detail,'Você já está inscrito nesta atividade.');
+    const unique=[...new Map(created.map(result=>[result.body.registration.id,result.body.registration])).values()];
     assert.equal(unique.length,2);assert.equal(unique.filter(item=>item.status==='CONFIRMED').length,1);assert.equal(unique.filter(item=>item.status==='WAITLISTED').length,1);
+    assert.deepEqual(unique.map(item=>item.userId).sort(),[a.id,b.id].sort());
+    const stored=(await Promise.all([a,b].map(who=>call('/registrations',who.token)))).flatMap(result=>{assert.equal(result.status,200);return result.body.registrations.filter(item=>item.activityId===event.activities[0].id);});
+    assert.deepEqual(stored.map(item=>item.id).sort(),unique.map(item=>item.id).sort());
     const confirmed=unique.find(item=>item.status==='CONFIRMED'),waiting=unique.find(item=>item.status==='WAITLISTED');
     const user=confirmed.userId===a.id?a:b,waiter=waiting.userId===a.id?a:b;
     assert.equal((await call('/registrations/'+confirmed.id,outsider.token)).status,404);

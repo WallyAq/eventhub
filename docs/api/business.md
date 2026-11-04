@@ -71,7 +71,9 @@ Se `activity.waitlistEnabled` for false e a atividade estiver lotada após a man
 | PENDING_PAYMENT | Aprovação antes do prazo | CONFIRMED |
 | PENDING_PAYMENT | Prazo vencido | EXPIRED |
 | PENDING_PAYMENT | Recusa | CANCELLED |
-| Estado ativo | Cancelamento do participante/evento | CANCELLED |
+| CONFIRMED | Cancelamento do participante/organizador antes da atividade | CANCELLED |
+| PENDING_PAYMENT/WAITLISTED | Cancelamento do participante/organizador, inclusive após início | CANCELLED |
+| Estado ativo | Cancelamento do evento | CANCELLED |
 | CANCELLED/EXPIRED | Nova solicitação com outra chave | Nova inscrição, se o evento estiver aberto |
 
 Callbacks internos autenticados: GET /internal/registrations/:id e POST /internal/registrations/:id/payment com outcome APPROVED/DECLINED/EXPIRED. Não passam pelo Gateway. Aprovação tardia/repetida não reabre estados terminais.
@@ -84,7 +86,7 @@ Resultado é registrado como PENDING antes de chamar Registration. Se a dependê
 
 ## Notification e RabbitMQ
 
-Registration grava outbox na mesma transação da inscrição. Publicador usa mensagens persistentes e confirmação do broker. Fila durável notifications vinculada a registration.# no exchange topic eventhub. Entrega é pelo menos uma vez; Notification deduplica pelo ID na tabela deliveries. A entrega simulada é o registro SENT, sem envio de e-mail.
+Registration grava outbox na mesma transação da inscrição. Publicador usa mensagens persistentes e confirmação do broker. Fila durável notifications vinculada a registration.# no exchange topic eventhub. Entrega é pelo menos uma vez; Notification deduplica pelo ID na tabela deliveries. `MAIL_MODE=mailbox` grava uma mensagem privada local; `MAIL_MODE=smtp` consulta destinatário e inscrição pelas APIs proprietárias e envia pelo transporte configurado. Apenas aceitação bem-sucedida resulta em SENT; falhas preservam tentativas/retry/DLQ. O padrão local não envia e-mail externo.
 
 Envelope v1: id, type, version, registrationId, userId. Tipos: registration.reserved, registration.waitlisted, registration.confirmed, registration.cancelled, registration.expired. Erros de consumo passam por até três tentativas e seguem para notifications.failed. Falha do consumidor ou broker não desfaz confirmação. Não apague volumes/filas para recuperar mensagens.
 
@@ -92,4 +94,4 @@ Envelope v1: id, type, version, registrationId, userId. Tipos: registration.rese
 
 POST /auth/password/forgot aceita email e retorna 202 genérico. POST /auth/password/reset aceita token e password (8–128 caracteres). Tokens aleatórios são armazenados como hash, expiram em 30 minutos e são consumidos uma vez; redefinir invalida os outros links do usuário. Limite separado de dez chamadas por IP em quinze minutos.
 
-Entrega simulada em arquivos privados de /tmp/eventhub-mail dentro do Identity, sem endpoint público para consultar links. Arquivo: SHA-256 do e-mail normalizado + .json; contém path com token no fragmento da URL. Operador local pode inspecionar com docker compose exec identity. Não publique esses arquivos ou tokens. Caixa efêmera em recriação do container; SMTP fica para evolução. JWTs emitidos continuam válidos até expirar.
+Por padrão, entrega em arquivos privados de /tmp/eventhub-mail dentro do Identity, sem endpoint público para consultar links. Arquivo: SHA-256 do e-mail normalizado + .json; contém path com token no fragmento da URL. Operador local pode inspecionar com docker compose exec identity; não publique esses arquivos ou tokens. Caixa efêmera em recriação do contêiner. SMTP configurável utiliza outbox durável. Logout revoga um token; troca/reset de senha e confirmação de e-mail invalidam todas as sessões anteriores. Consulte [Identity](identity.md) para contratos de sessão, e-mail e transporte, [gestão de inscritos](organizer-registrations.md), [presença](attendance.md), [certificados](certificates.md) e [relatórios](reporting.md) para os domínios novos.

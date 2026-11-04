@@ -58,6 +58,10 @@ services:
       REGISTRATIONS_URL: http://registrations:8000
       PAYMENTS_URL: http://payments:3000
       NOTIFICATIONS_URL: http://notifications:8000
+      ATTENDANCE_URL: http://attendance:8000
+      CERTIFICATES_URL: http://certificates:8000
+      REPORTING_URL: http://reporting:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
 
   identity:
     <<: *app
@@ -71,6 +75,16 @@ services:
       PGPASSWORD: ${IDENTITY_DB_PASSWORD:?Defina IDENTITY_DB_PASSWORD no .env}
       JWT_PRIVATE_KEY_BASE64: ${JWT_PRIVATE_KEY_BASE64:?Execute node scripts/init-identity-keys.mjs}
       JWT_PUBLIC_KEY_BASE64: ${JWT_PUBLIC_KEY_BASE64:?Execute node scripts/init-identity-keys.mjs}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+      MAIL_MODE: ${MAIL_MODE:-mailbox}
+      MAIL_FROM: ${MAIL_FROM:-EventHub <noreply@eventhub.local>}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +154,78 @@ services:
       PGPASSWORD: ${NOTIFICATION_DB_PASSWORD:?Defina NOTIFICATION_DB_PASSWORD no .env}
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      IDENTITY_URL: http://identity:3000
+      REGISTRATIONS_URL: http://registrations:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+      MAIL_MODE: ${MAIL_MODE:-mailbox}
+      MAIL_FROM: ${MAIL_FROM:-EventHub <noreply@eventhub.local>}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  attendance:
+    <<: *app
+    build: ./services/attendance
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: attendance_user
+      PGDATABASE: attendance_db
+      PGPASSWORD: ${ATTENDANCE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      IDENTITY_URL: http://identity:3000
+      EVENTS_URL: http://events:8000
+      REGISTRATIONS_URL: http://registrations:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  certificates:
+    <<: *app
+    build: ./services/certificates
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: certificate_user
+      PGDATABASE: certificate_db
+      PGPASSWORD: ${CERTIFICATE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      IDENTITY_URL: http://identity:3000
+      EVENTS_URL: http://events:8000
+      REGISTRATIONS_URL: http://registrations:8000
+      ATTENDANCE_URL: http://attendance:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+      PUBLIC_BASE_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reporting:
+    <<: *app
+    build: ./services/reporting
+    healthcheck: *python-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: reporting_user
+      PGDATABASE: reporting_db
+      PGPASSWORD: ${REPORTING_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      IDENTITY_URL: http://identity:3000
+      EVENTS_URL: http://events:8000
+      REGISTRATIONS_URL: http://registrations:8000
+      ATTENDANCE_URL: http://attendance:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -155,6 +241,9 @@ services:
       REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:?Defina REGISTRATION_DB_PASSWORD no .env}
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD no .env}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Defina NOTIFICATION_DB_PASSWORD no .env}
+      ATTENDANCE_DB_PASSWORD: ${ATTENDANCE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      CERTIFICATE_DB_PASSWORD: ${CERTIFICATE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      REPORTING_DB_PASSWORD: ${REPORTING_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/db/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro

@@ -46,6 +46,14 @@ export async function updateProfile(token: string, name: string, details: { cpf?
 export async function changePassword(token: string, currentPassword: string, newPassword: string) {
   await request('/users/me/password', 'POST', { currentPassword, newPassword }, token);
 }
+export async function logoutSession(token: string) {
+  const response = await fetch('/api/auth/logout', {
+    method: 'POST', headers: { authorization: 'Bearer ' + token },
+    cache: 'no-store', keepalive: true, signal: AbortSignal.timeout(8000),
+  });
+  if (response.status !== 204 && response.status !== 401)
+    throw new ApiError(response.status, 'Não foi possível revogar a sessão no servidor.');
+}
 export function errorMessage(error: unknown): string {
   return error instanceof Error && !(error instanceof TypeError) ? error.message : 'Não foi possível conectar ao serviço. Tente novamente.';
 }
