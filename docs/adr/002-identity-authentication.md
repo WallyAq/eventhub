@@ -14,11 +14,13 @@ RF01 e RN07 exigem identidade e acesso restrito aos próprios dados. O Gateway d
 
 ## Decisão
 
-Usar JWT RS256 de 15 minutos. Identity guarda a chave privada; Gateway recebe somente a pública. Ambos verificam assinatura, algoritmo, emissor, audiência, expiração, emissão, sujeito e papel. O endpoint /users/me usa exclusivamente o sujeito autenticado. Cadastro público cria somente PARTICIPANT.
+Usar JWT RS256 de uma hora (atualizado por solicitação do usuário em 30/10/2026). Identity guarda a chave privada; Gateway recebe somente a pública. Ambos verificam assinatura, algoritmo, emissor, audiência, expiração, emissão, sujeito e papel. O endpoint /users/me usa exclusivamente o sujeito autenticado. Cadastro público cria somente PARTICIPANT.
 
 Usar scrypt assíncrono do Node.js com N=32768, r=8, p=3, salt aleatório de 16 bytes, saída de 64 bytes e comparação timingSafeEqual. Limitar entradas e tentativas de autenticação. Não introduzir ORM para a primeira tabela; usar pg e SQL parametrizado.
 
-O frontend guarda a sessão somente em memória, sem localStorage. Atualizar a página exige novo login. Logout remove a sessão local; não revoga JWT já emitido.
+O frontend guarda a sessão em memória e localStorage, com prazo absoluto limitado ao exp do JWT. Atualizar a página ou reabrir o navegador restaura a sessão sem renovar o prazo. Eventos storage sincronizam entrada/saída entre abas. Expiração, retomada da aba e logout eliminam o cache vencido. Logout não revoga JWT já emitido.
+
+A persistência atende à continuidade de uma hora solicitada para o protótipo e mantém os contratos Bearer existentes. Código executado na mesma origem pode acessar localStorage; não são armazenadas senhas. Uma evolução com cookie HttpOnly exigirá adaptar autenticação no Gateway e proteção CSRF. Não foi introduzido refresh token ou sessão sem expiração.
 
 ## Migrações
 

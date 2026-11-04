@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getPlatformStatus } from '../services/api';
 import type { PlatformStatus } from '../types/status';
 import { Link } from 'react-router-dom';
+import { Brand } from '../components/Brand';
 
 const labels: Record<string, string> = {
   identity: 'Identidade e acesso', events: 'Eventos e programação',
@@ -23,7 +24,7 @@ export function EnvironmentPage() {
   useEffect(() => { void refresh(); }, []);
   return (
     <div className="shell">
-      <header><Link className="brand" to="/">event<span>hub</span><span className="brand-dot">●</span></Link><nav className="account-nav"><Link to="/perfil">Minha conta</Link><span className="environment">Ambiente local · UECE</span></nav></header>
+      <header><Brand /><nav className="account-nav"><Link to="/perfil">Minha conta</Link><span className="environment">Ambiente local · UECE</span></nav></header>
       <main>
         <section className="intro">
           <span className="eyebrow">CONEXÕES QUE MOVEM O CONHECIMENTO</span>

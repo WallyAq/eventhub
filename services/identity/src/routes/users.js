@@ -15,6 +15,7 @@ export function createUserRouter(service, tokens) {
   router.post('/auth/login', limit, async (req, res) => res.json(await service.login(req.body)));
   router.get('/users/me', authenticate(tokens), async (req, res) => res.json({ user: await service.profile(req.identity.sub) }));
   router.patch('/users/me', authenticate(tokens), async (req, res) => res.json({ user: await service.updateProfile(req.identity.sub, req.body) }));
+  router.post('/users/me/password', authenticate(tokens), limit, async (req, res) => { await service.changePassword(req.identity.sub, req.body); res.json({ message: 'Senha atualizada. Entre novamente.' }); });
   return router;
 }
 

@@ -56,6 +56,9 @@ test('registration, normalized duplicate email, login and own profile', async ()
   const result = await service.login({ email: 'MARIA@example.com', password: 'Senha de teste 123!' });
   assert.equal(result.user.passwordHash, undefined);
   assert.equal((await tokens.verify(result.accessToken)).sub, first.id);
+  const claims = await tokens.verify(result.accessToken);
+  assert.equal(result.expiresIn, 3600);
+  assert.equal(claims.exp - claims.iat, 3600);
   await assert.rejects(service.updateProfile(first.id, { role: 'ORGANIZER', name: 'Maria' }), { status: 400 });
   assert.equal((await service.updateProfile(first.id, { name: 'Maria Atualizada' })).name, 'Maria Atualizada');
 });
@@ -67,6 +70,12 @@ test('JWT rejects expiration, wrong audience, wrong signature and algorithm', as
   const make = (audience, expiration, signer = key) => new SignJWT({ role: 'PARTICIPANT' })
     .setProtectedHeader({ alg: 'RS256' }).setIssuer('eventhub-identity')
     .setAudience(audience).setSubject(subject).setIssuedAt().setExpirationTime(expiration).sign(signer);
+  const now = Math.floor(Date.now() / 1000);
+  const aged = age => new SignJWT({ role: 'PARTICIPANT' }).setProtectedHeader({ alg: 'RS256' })
+    .setIssuer('eventhub-identity').setAudience('eventhub-api').setSubject(subject)
+    .setIssuedAt(now - age).setExpirationTime(now + 60).sign(key);
+  assert.equal((await tokens.verify(await aged(45 * 60))).sub, subject);
+  await assert.rejects(tokens.verify(await aged(61 * 60)));
   await assert.rejects(tokens.verify(await make('eventhub-api', '0s')));
   await assert.rejects(tokens.verify(await make('wrong', '15m')));
   await assert.rejects(tokens.verify(await make('eventhub-api', '15m', otherKeys.privateKey)));

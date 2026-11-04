@@ -6,7 +6,7 @@ export async function createVerifier(publicBase64) {
   return async (token) => {
     const { payload } = await jwtVerify(token, key, {
       algorithms: ['RS256'], issuer: 'eventhub-identity', audience: 'eventhub-api',
-      requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '15m',
+      requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '1h',
     });
     if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || payload.role !== 'PARTICIPANT') throw new Error('Invalid claims');
     return payload;

@@ -26,7 +26,9 @@ Nomes não são únicos globalmente: organizações distintas podem ter o mesmo 
 
 ## PATCH /api/organizations/:id
 
-Somente OWNER. Corpo com name e/ou description, pelo menos um deles. 200: organization atualizada. Nenhuma alteração de membro ou papel é aceita neste endpoint.
+Somente OWNER. Corpo com pelo menos um dos campos: name, description, cnpj, legalName, entityType, phone ou email. Nome mantém os limites do cadastro; razão social tem até 120 caracteres, tipo de entidade até 80, telefone vazio ou 10–15 dígitos, e-mail vazio ou endereço válido até 254 caracteres. CNPJ normalizado tem 14 caracteres alfanuméricos e é único (409 em duplicidade). Não há validação cadastral externa. Campos omitidos são preservados. 200: organization atualizada. Nenhuma alteração de membro ou papel é aceita neste endpoint.
+
+Consultas também retornam os campos institucionais, podendo ser null em organizações antigas. O e-mail institucional é separado da credencial pessoal de login. O cadastro institucional público, que cria conta e instituição atomicamente, está descrito em [identity.md](identity.md).
 
 ## GET /api/organizations/:id/members
 

@@ -9,6 +9,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 function parseUser(value: unknown): User {
   const user = record(value);
+  for (const key of ['cpf','phone']) if (user[key] != null && typeof user[key] !== 'string') throw new Error('Resposta inválida do serviço.');
   if (typeof user.id !== 'string' || typeof user.name !== 'string' || typeof user.email !== 'string'
       || user.role !== 'PARTICIPANT' || typeof user.createdAt !== 'string' || typeof user.updatedAt !== 'string')
     throw new Error('Resposta inválida do serviço.');
@@ -23,11 +24,11 @@ async function request(path: string, method: string, body?: unknown, token?: str
     cache: 'no-store',
   });
   const data = record(await response.json());
-  if (!response.ok) throw new ApiError(response.status, typeof data.message === 'string' ? data.message : 'Não foi possível concluir a operação.');
+  if (!response.ok) throw new ApiError(response.status, typeof data.message === 'string' ? data.message : typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) ? 'Verifique os campos, datas e horários informados.' : 'Não foi possível concluir a operação.');
   return data;
 }
-export async function registerParticipant(name: string, email: string, password: string) {
-  return parseUser((await request('/auth/register', 'POST', { name, email, password })).user);
+export async function registerParticipant(name: string, email: string, password: string, details: Record<string, unknown> = {}) {
+  return parseUser((await request('/auth/register', 'POST', { name, email, password, ...details })).user);
 }
 export async function login(email: string, password: string): Promise<LoginResult> {
   const data = await request('/auth/login', 'POST', { email, password });
@@ -39,11 +40,14 @@ export async function login(email: string, password: string): Promise<LoginResul
 export async function getProfile(token: string, signal?: AbortSignal) {
   return parseUser((await request('/users/me', 'GET', undefined, token, signal)).user);
 }
-export async function updateProfile(token: string, name: string) {
-  return parseUser((await request('/users/me', 'PATCH', { name }, token)).user);
+export async function updateProfile(token: string, name: string, details: { cpf?: string; phone?: string } = {}) {
+  return parseUser((await request('/users/me', 'PATCH', { name, ...details }, token)).user);
+}
+export async function changePassword(token: string, currentPassword: string, newPassword: string) {
+  await request('/users/me/password', 'POST', { currentPassword, newPassword }, token);
 }
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Não foi possível conectar ao serviço. Tente novamente.';
+  return error instanceof Error && !(error instanceof TypeError) ? error.message : 'Não foi possível conectar ao serviço. Tente novamente.';
 }
 export { request as identityRequest };
 

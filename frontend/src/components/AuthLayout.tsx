@@ -1,25 +1,14 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { accessAreas } from '../auth/access';
 import type { AccessArea } from '../auth/access';
+import { Brand } from './Brand';
 
-export function AuthLayout({ children, area = 'participant' }: { children: ReactNode; area?: AccessArea }) {
-  const access = accessAreas[area];
-  return <div className="shell">
-    <header>
-      <Link className="brand" to="/">event<span>hub</span><span className="brand-dot">●</span></Link>
-      <nav className="account-nav" aria-label="Navegação principal"><span className="area-label">Área de {access.label.toLowerCase()}</span><Link to="/acesso">Escolher acesso</Link></nav>
-    </header>
-    <main className="auth-main">
-      <section className="intro">
-        <span className="area-badge">{access.label}</span><br />
-        <span className="eyebrow">{access.eyebrow}</span>
-        <h1>{access.hero}</h1>
-        <p>{access.heroDescription}</p>
-      </section>
-      {children}
+export function AuthLayout({ children, area = 'participant', variant = 'login' }: { children: ReactNode; area?: AccessArea; variant?: 'login' | 'register' }) {
+  return <div className={'auth-page ' + (variant === 'register' ? 'registration-page' : 'login-page')}>
+    <nav className="auth-area-nav" aria-label="Área de acesso"><Link to="/acesso">← Escolher acesso</Link><span>{area === 'participant' ? 'Participante' : 'Organização'}</span></nav>
+    <main className={'auth-frame ' + (variant === 'register' ? 'registration-frame' : 'login-frame')}>
+      {children}<div className="auth-brand"><Brand login={variant === 'login'} /></div>
     </main>
-    <footer><span>EventHub · Projeto acadêmico UECE</span><span>Encontros. Ideias. Possibilidades.</span></footer>
   </div>;
 }
 

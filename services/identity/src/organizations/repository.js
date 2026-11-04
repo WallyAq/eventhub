@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-const columns = 'o.id, o.name, o.description, o.created_at AS "createdAt", o.updated_at AS "updatedAt", m.role AS "membershipRole"';
+const columns = 'o.id, o.name, o.description, o.cnpj,o.legal_name AS "legalName",o.entity_type AS "entityType",o.phone,o.email, o.created_at AS "createdAt", o.updated_at AS "updatedAt", m.role AS "membershipRole"';
 
 export function createOrganizationRepository(pool) {
   return {
@@ -25,10 +25,11 @@ export function createOrganizationRepository(pool) {
     async findForUser(id, userId) {
       return (await pool.query(`SELECT ${columns} FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE o.id=$1 AND m.user_id=$2`, [id, userId])).rows[0];
     },
-    async update(id, userId, { name, description }) {
-      return (await pool.query(`UPDATE organizations o SET name=COALESCE($3,o.name),description=COALESCE($4,o.description),updated_at=now()
+    async update(id, userId, { name, description, cnpj, legalName, entityType, phone, email }) {
+      return (await pool.query(`UPDATE organizations o SET name=COALESCE($3,o.name),description=COALESCE($4,o.description),
+        cnpj=COALESCE($5,o.cnpj),legal_name=COALESCE($6,o.legal_name),entity_type=COALESCE($7,o.entity_type),phone=COALESCE($8,o.phone),email=COALESCE($9,o.email),updated_at=now()
         FROM organization_members m WHERE o.id=$1 AND m.organization_id=o.id AND m.user_id=$2 AND m.role='OWNER'
-        RETURNING ${columns}`, [id, userId, name ?? null, description ?? null])).rows[0];
+        RETURNING ${columns}`, [id, userId, name ?? null, description ?? null, cnpj ?? null, legalName ?? null, entityType ?? null, phone ?? null, email ?? null])).rows[0];
     },
     async members(id, userId) {
       return (await pool.query(`SELECT u.id,u.name,u.email,m.role,m.created_at AS "createdAt" FROM organization_members m JOIN users u ON u.id=m.user_id

@@ -1,0 +1,22 @@
+.program-speakers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:24px}
+.program-person,.program-activity{background:#f9f9ff;border:1px solid var(--border);border-radius:6px;padding:16px;min-width:0}
+.program-person-heading{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.program-person strong,.program-person small{overflow-wrap:anywhere}
+.program-person p{font-size:13px;margin:8px 0 4px;color:#464555}
+.program-person small{font-size:12px;color:var(--muted);display:block}
+.program-person .program-biography{white-space:pre-wrap;margin-top:12px}
+.program-tag{background:#e9edff;color:var(--primary-text);font-size:11px;padding:3px 8px;border-radius:4px;display:inline-block}
+.program-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0}
+.program-actions .text-button{font-size:13px}
+.program-empty{border:1px dashed var(--border);border-radius:6px;padding:24px;text-align:center;margin-bottom:24px}
+.program-empty p{font-size:14px;margin-bottom:4px}
+.program-empty small{color:#464555;font-size:13px}
+.program-activities{display:grid;gap:16px}
+.program-activity h3{margin-top:8px;overflow-wrap:anywhere}
+.program-description{white-space:pre-wrap;font-size:13px;color:#464555;overflow-wrap:anywhere;margin:16px 0}
+.program-activity-meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:12px}
+.program-activity-meta p{display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:#464555;overflow-wrap:anywhere}
+.program-activity-footer{border-top:1px solid var(--border);margin-top:16px;padding-top:12px;display:flex;justify-content:space-between;gap:12px;font-size:12px;flex-wrap:wrap}
+.event-program-section>.info,.event-program-section>.error{margin:16px 0 0}
+@media(max-width:1000px){.program-speakers{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.program-speakers{grid-template-columns:1fr}.program-activity>.section-toolbar{flex-wrap:nowrap}.program-person-heading{flex-direction:column}.program-activity .program-actions{flex-wrap:wrap;justify-content:flex-end}}

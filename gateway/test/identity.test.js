@@ -30,6 +30,12 @@ test('gateway only verifies RSA tokens with expected claims', async () => {
   const sign = (role, expiry, audience = 'eventhub-api') => new SignJWT({ role }).setProtectedHeader({ alg: 'RS256' })
     .setIssuer('eventhub-identity').setAudience(audience).setSubject(randomUUID()).setIssuedAt().setExpirationTime(expiry).sign(privateKey);
   assert.equal((await verify(await sign('PARTICIPANT', '15m'))).role, 'PARTICIPANT');
+  const now = Math.floor(Date.now() / 1000);
+  const aged = age => new SignJWT({ role: 'PARTICIPANT' }).setProtectedHeader({ alg: 'RS256' })
+    .setIssuer('eventhub-identity').setAudience('eventhub-api').setSubject(randomUUID())
+    .setIssuedAt(now - age).setExpirationTime(now + 60).sign(privateKey);
+  assert.equal((await verify(await aged(45 * 60))).role, 'PARTICIPANT');
+  await assert.rejects(verify(await aged(61 * 60)));
   await assert.rejects(verify(await sign('PARTICIPANT', '0s')));
   await assert.rejects(verify(await sign('ORGANIZER', '15m')));
   await assert.rejects(verify(await sign('PARTICIPANT', '15m', 'wrong')));

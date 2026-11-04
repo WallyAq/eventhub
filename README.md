@@ -4,9 +4,11 @@ Plataforma acadêmica da UECE para gerenciamento de eventos, com microsserviços
 
 ## Estado atual
 
-Etapa 3: cadastro de participantes, login JWT, perfil e organizações com responsáveis e organizadores estão implementados de ponta a ponta, sobre a base de cinco serviços, Gateway, React/TypeScript/Vite, Nginx, PostgreSQL e RabbitMQ. Eventos, inscrições, pagamentos e notificações de negócio ainda não estão implementados. Não há consumidor RabbitMQ nesta etapa.
+O protótipo inclui contas/organizações, catálogo/gestão de eventos, atividades, inscrições com reserva/lista de espera, pagamento simulado e notificações simuladas por RabbitMQ. Cinco bancos próprios preservam a separação dos serviços. Attendance, Certificate e Reporting continuam modelados para evolução.
 
-As telas de acesso são provisórias; a adaptação ao Figma será feita quando o link for fornecido. O painel de diagnóstico permanece disponível em /diagnostico.
+As telas do Figma incluem recuperação, catálogo, gestão/criação de eventos e inscrição. O fluxo do participante possui seleção de atividade, conferência de dados, pagamento simulado e confirmação, além de Minhas inscrições. Os dados exibidos vêm das APIs. Certificação automática permanece desabilitada. Diagnóstico em /diagnostico. Veja [contratos e estados](docs/api/business.md) e [rotas e validação do participante](docs/validation/2026-11-03-participant.md).
+
+Consulte a [revisão visual e lista de páginas/popups](docs/validation/2026-10-30-visual-review.md) para rotas, correções e validação em desktop e celular.
 
 ## Pré-requisitos e execução
 
@@ -17,14 +19,21 @@ No PowerShell, na raiz:
 ```powershell
 Copy-Item .env.example .env
 node scripts/init-identity-keys.mjs
+node scripts/init-internal-key.mjs
 docker compose up --build -d --wait --wait-timeout 180
 ```
 
 Não sobrescreva um `.env` existente. Os valores de exemplo são exclusivos para desenvolvimento local. O arquivo `.env` é ignorado pelo Git. O script gera as chaves RSA locais sem exibi-las e preserva um par existente; usa Node.js 24 no host.
 
-Abra http://localhost:8080 e escolha Participante ou Organização. O participante usa /participante/login e /participante/cadastro; a organização usa /organizacao/login e /organizacao/cadastro. Após entrar, os destinos são /perfil e /organizacoes, respectivamente. A senha deve ter entre 8 e 128 caracteres. A sessão dura até 15 minutos e fica somente na memória da aba; atualizar a página exige novo login. O Nginx publica somente em loopback. Os bancos, broker e aplicações internas não possuem portas publicadas.
+Abra http://localhost:8080 e escolha Participante ou Organização. O participante usa /participante/login e /participante/cadastro; a organização usa /organizacao/login e /organizacao/cadastro. Após entrar, os destinos são /eventos e /organizacoes, respectivamente. A senha deve ter entre 8 e 128 caracteres. A sessão dura uma hora desde o login e é restaurada ao atualizar a página ou reabrir o navegador. O prazo original é preservado; sair da conta remove a sessão salva e desconecta as outras abas do mesmo navegador. O Nginx publica somente em loopback. Os bancos, broker e aplicações internas não possuem portas publicadas.
 
-A área da organização autentica a conta pessoal do responsável ou organizador. Quem já possui conta de participante pode usá-la nessa área; os vínculos OWNER/ORGANIZER continuam sendo verificados pelo Identity. O cadastro da organização começa pela conta do responsável e continua, após o login, com a criação da organização. Não há senha compartilhada da equipe. /login leva à escolha de acesso; /cadastro redireciona ao cadastro de participante para compatibilidade.
+A área da organização autentica a conta pessoal do responsável ou organizador. Quem já possui conta de participante pode usá-la nessa área; os vínculos OWNER/ORGANIZER continuam sendo verificados pelo Identity. O cadastro institucional cria a conta e a organização com vínculo OWNER na mesma transação. Contas existentes também podem criar organizações em /organizacoes. Não há senha compartilhada da equipe. /login leva à escolha de acesso; /cadastro redireciona ao cadastro de participante para compatibilidade.
+
+O perfil participante fica em /perfil; o institucional em /organizacao/perfil. Ambos abrem em consulta e oferecem edição dos dados e troca de senha. Troca de senha encerra a sessão local; tokens anteriores continuam válidos até expirar. “Lembrar de mim” guarda somente e-mail. Recuperação usa caixa local simulada, descrita no contrato; alteração do e-mail de login permanece pendente.
+
+Minhas Inscrições separa ativas, confirmadas cujo período terminou e canceladas/expiradas, com contagens e dados reais. A conclusão do período não comprova presença nem habilita certificados. As novas referências e a logo transparente estão descritas na [validação de 04/11](docs/validation/2026-11-04-participant.md).
+
+Participantes encontram /eventos e /minhas-inscricoes no menu. Organizações encontram /organizacao/eventos e /organizacao/eventos/novo. Salve um rascunho com ao menos uma atividade e publique para aparecer no catálogo. Preço e capacidade ficam fixos após publicação. Os detalhes e a seleção da atividade mostram vagas restantes consultadas no Registration, considerando reservas e a fila existente. Gratuitas confirmam com vaga; pagas exigem aprovação simulada antes do prazo. Não são coletados dados bancários.
 
 ```powershell
 docker compose ps
@@ -44,6 +53,8 @@ Com o ambiente iniciado:
 node --test tests/integration/platform.test.mjs tests/integration/identity.test.mjs
 node --test tests/integration/identity-migrations.test.mjs
 node --test tests/integration/organizations.test.mjs
+node --test tests/integration/figma-identity.test.mjs
+node --test tests/integration/business.test.mjs
 ```
 
 Os testes verificam Nginx → Gateway → aplicações Node/Python → bancos, respostas 404, rastreabilidade e isolamento dos cinco usuários de banco. A verificação de permissões utiliza `docker compose exec`.
@@ -79,6 +90,8 @@ npm run dev
 O Vite informa a URL local e encaminha `/api` para o Nginx na porta 8080. Se mudar HTTP_PORT, ajuste o alvo em `vite.config.ts`. Para validar tipos e gerar a versão de produção: `npm run build`.
 
 Cada aplicação Node possui seu próprio `package-lock.json`. As dependências Python estão fixadas em seu respectivo `requirements.txt`; os containers usam ambientes isolados.
+
+Para validar as telas com os serviços iniciados, instale as dependências do frontend e execute `npm --prefix frontend run test:e2e` na raiz. A configuração usa Microsoft Edge instalado, em sessão isolada sem interface. As capturas ficam em frontend/test-results, ignoradas pelo Git. Os testes criam contas sintéticas; respeite o limite de autenticação ao repetir as suítes.
 
 ## Diagnóstico e contratos
 

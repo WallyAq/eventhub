@@ -1,0 +1,45 @@
+.participant-details{color:#141b2b}
+.participant-details__back{display:inline-block;margin-bottom:24px;font-size:13px;line-height:20px;text-decoration:none}
+.participant-details__back:hover{text-decoration:underline}
+.participant-details>.business-card{margin-top:32px}
+.participant-details>.participant-details__heading{margin-top:0}
+.participant-details__heading{display:flex;justify-content:space-between;align-items:center;gap:32px}
+.participant-details__heading h1{font-size:32px;line-height:42px;margin:0;overflow-wrap:anywhere}
+.participant-details .primary-button{min-height:42px;padding:10px 24px;font-size:14px;line-height:20px;font-weight:500;text-align:center;flex-shrink:0}
+.participant-details__heading .primary-button{min-width:180px}
+.participant-details__section>h2{margin:0 0 24px}
+.participant-details__section>p{font-size:15px;line-height:26px;color:#464555;overflow-wrap:anywhere;margin:0}
+.participant-details__information{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0;border-top:1px solid var(--border)}
+.participant-details__information>div{padding:24px 24px 24px 0;min-width:0}
+.participant-details__information>div:nth-child(2n){padding-right:0;padding-left:24px}
+.participant-details__information>div:nth-child(n+3){border-top:1px solid var(--border);padding-bottom:0}
+.participant-details__information dt{font-size:14px;line-height:22px;font-weight:600;margin-bottom:4px}
+.participant-details__information dd{font-size:15px;line-height:26px;color:#464555;margin:0;overflow-wrap:anywhere}
+.participant-details__information a{text-decoration:none}
+.participant-details__information a:hover{text-decoration:underline}
+.participant-details__external{display:inline-block;margin-left:5px;font-size:17px}
+.participant-details__session{display:block;font-size:13px;line-height:22px;margin-top:3px}
+.participant-details__section>.participant-details__intro{margin-bottom:24px}
+.participant-details__activities{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.participant-details__activity{background:#f9f9ff;border:1px solid var(--border);border-radius:8px;padding:24px;min-width:0;display:flex;flex-direction:column}
+.participant-details__activity h3,.participant-details__speaker h3{font-size:18px;line-height:27px;font-weight:600;margin:0;overflow-wrap:anywhere}
+.participant-details__activity h3{padding-bottom:18px;border-bottom:1px solid #c7c4d866}
+.participant-details__description{font-size:13px;line-height:22px;color:#464555;margin:16px 0 0;overflow-wrap:anywhere}
+.participant-details__activity-meta{padding-top:20px;margin-bottom:32px}
+.participant-details__activity-meta p{display:flex;align-items:flex-start;gap:8px;color:#464555;font-size:13px;line-height:22px;margin:0 0 8px;overflow-wrap:anywhere}
+.participant-details__activity-meta .business-icon{width:15px;height:15px;object-fit:contain;margin-top:3px}
+.participant-details__activity-meta .participant-details__capacity{font-size:12px;margin:12px 0 0}
+.participant-details__capacity .activity-seats>strong{font-weight:600;color:#141b2b}
+.participant-details__section>.participant-details__availability-error{font-size:13px;line-height:22px;margin-bottom:20px}
+.participant-details__activity-actions{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:auto}
+.participant-details__activity-actions>strong{font-size:18px;line-height:26px}
+.participant-details__activity-actions>.primary-button{max-width:100%;min-width:0;padding:10px 16px}
+.participant-details__speakers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.participant-details__speaker{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;min-width:0}
+.participant-details__speaker p{font-size:14px;line-height:24px;color:#464555;overflow-wrap:anywhere;margin:8px 0 0}
+.participant-details__speaker .participant-details__institution{font-size:13px;line-height:22px;color:var(--primary-text);margin-top:3px}
+.participant-details__speaker .participant-details__degree{font-size:12px;line-height:20px;color:var(--muted)}
+.participant-details__section>.participant-details__empty{border:1px dashed var(--border);border-radius:6px;padding:24px;text-align:center;font-size:14px}
+@media(max-width:700px){.participant-details .participant-details__information>div:nth-child(n+3):not(:last-child){padding-bottom:18px}}
+@media(max-width:1100px){.participant-details__heading h1{font-size:28px;line-height:36px}.participant-details__heading{gap:24px}.participant-details__activity-actions{align-items:flex-start;flex-direction:column}.participant-details__speakers{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.participant-details>.business-card{margin-top:24px}.participant-details>.participant-details__heading{margin-top:0}.participant-details__heading{flex-direction:column;align-items:flex-start;gap:20px}.participant-details__heading h1{font-size:26px;line-height:34px}.participant-details__heading .primary-button{width:100%;min-width:0}.participant-details__section>h2{margin-bottom:18px}.participant-details__section>p{font-size:14px;line-height:24px}.participant-details__information,.participant-details__activities,.participant-details__speakers{grid-template-columns:1fr}.participant-details__information>div,.participant-details__information>div:nth-child(2n){padding:18px 0;border-top:1px solid var(--border)}.participant-details__information>div:first-child{border-top:0}.participant-details__information>div:last-child{padding-bottom:0}.participant-details__information dd{font-size:14px;line-height:24px}.participant-details__activity{padding:20px}.participant-details__activity h3,.participant-details__speaker h3{font-size:16px;line-height:24px}.participant-details__activity-actions{gap:18px}.participant-details__activity-actions>.primary-button{width:100%}.participant-details__activity-meta{margin-bottom:24px}.participant-details__speakers{gap:16px}.participant-details__speaker{padding:20px}.participant-details__back{margin-bottom:20px}}

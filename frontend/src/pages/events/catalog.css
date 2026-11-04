@@ -1,0 +1,41 @@
+.participant-catalog{color:#141b2b}
+.participant-catalog>section+section{margin-top:40px}
+.participant-catalog h2{margin:0 0 16px;font-size:24px;line-height:32px}
+.participant-featured-card{padding:32px;background:white;border:1px solid var(--border);border-radius:8px;box-shadow:0 1px 2px #0000000d}
+.participant-featured-card h1{font-size:32px;line-height:40px;margin:0 0 12px;overflow-wrap:anywhere}
+.participant-featured-description{font-size:15px;line-height:24px;color:#464555;margin:0 0 12px}
+.participant-featured-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px 0;margin:0}
+.participant-featured-meta>div{min-width:0}
+.participant-featured-meta dt{font-size:12px;line-height:20px;color:var(--muted);margin-bottom:2px}
+.participant-featured-meta dd{font-size:15px;line-height:24px;font-weight:600;margin:0;overflow-wrap:anywhere}
+.participant-featured-card .card-actions{border:0;margin-top:0;padding-top:24px}
+.participant-catalog .primary-button,.participant-catalog .secondary-button{min-height:36px;padding:7px 16px;border-radius:4px;font-size:14px;line-height:20px;font-weight:500}
+.participant-catalog .card-actions>a{min-width:160px}
+.participant-event-list>h2{padding-bottom:18px;border-bottom:1px solid var(--border)}
+.participant-catalog .filter-bar{margin:24px 0;padding:16px;gap:12px}
+.participant-catalog .filter-bar select{width:25%;min-width:170px}
+.participant-catalog .filter-bar input,.participant-catalog .filter-bar select{min-height:42px}
+.participant-catalog .events-grid{gap:16px 24px}
+.participant-catalog .participant-event-card{padding:20px;min-width:0}
+.participant-event-card .event-description{font-size:13px;line-height:20px;min-height:40px;margin-bottom:12px}
+.participant-event-card .event-meta{margin-top:0;padding-top:16px}
+.participant-event-card .event-meta p{font-size:12px;line-height:18px;gap:6px;align-items:flex-start}
+.participant-event-card .event-meta .business-icon{margin-top:2px;max-width:16px;max-height:16px}
+.participant-event-card .event-price{padding-top:24px;margin-bottom:16px;font-size:14px;line-height:20px}
+.participant-event-card .card-actions{padding-top:20px;margin-top:0;gap:12px}
+.participant-catalog .participant-event-card .card-actions>a{min-width:0;flex:0 1 160px;font-size:14px;line-height:20px;padding:7px 12px}
+.participant-event-card .card-actions>.secondary-button{color:var(--primary-text)}
+.participant-pagination{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid var(--border);margin-top:16px;padding:24px 0;color:#464555}
+.participant-pagination>p{font-size:13px;line-height:20px;margin:0}
+.participant-pagination strong{font-weight:600;color:#141b2b}
+.participant-pagination nav{display:flex;gap:4px;align-items:center}
+.participant-pagination-item{display:inline-flex;gap:4px;align-items:center}
+.participant-pagination button{min-width:32px;min-height:32px;border:1px solid transparent;border-radius:4px;background:transparent;color:#464555;font-size:13px;padding:6px}
+.participant-pagination button[aria-current=page]{background:#e9edff;color:var(--primary-text);font-weight:600}
+.participant-pagination nav>button{min-width:26px;border-color:var(--border);font-size:20px;line-height:18px}
+.participant-pagination button:hover:not(:disabled){background:#e9edff}
+.participant-pagination button:disabled{cursor:default;opacity:.4}
+.participant-pagination-gap{padding:0 6px}
+@media(min-width:1600px){.participant-catalog .participant-event-card .card-actions>a{min-width:160px}}
+@media(max-width:1100px){.participant-featured-card h1{font-size:28px;line-height:36px}.participant-featured-meta{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}.participant-catalog .participant-event-card .card-actions>a{flex:1 1 140px}}
+@media(max-width:700px){.participant-catalog>section+section{margin-top:32px}.participant-catalog h2{font-size:20px;line-height:28px}.participant-featured-card{padding:20px}.participant-featured-card h1{font-size:24px;line-height:32px}.participant-featured-description{font-size:14px;line-height:22px}.participant-featured-meta{gap:16px;font-size:14px}.participant-featured-meta dd{font-size:14px;line-height:22px}.participant-catalog .filter-bar{gap:12px}.participant-catalog .filter-bar select{width:100%}.participant-catalog .card-actions{gap:12px}.participant-catalog .card-actions>a{flex:1 1 150px;min-width:0}.participant-pagination{flex-direction:column;align-items:flex-start;padding:20px 0}.participant-pagination nav{align-self:flex-end;max-width:100%;flex-wrap:wrap}.participant-catalog .participant-event-card .card-actions>a{flex:1 1 130px}}

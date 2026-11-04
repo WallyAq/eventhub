@@ -1,13 +1,19 @@
 # Próximas entregas
 
-1. **Base executável (esta entrega):** containers, bancos isolados, diagnóstico, frontend provisório e testes de infraestrutura.
-2. **Identity e organizações implementados:** cadastro/login, perfil, hash scrypt, JWT RS256, organizações e vínculos OWNER/ORGANIZER. Responsáveis editam organizações e adicionam contas existentes; membros consultam somente suas organizações. Recuperação e alterações de credenciais permanecem pendentes.
-3. **Event:** eventos e atividades, publicação/cancelamento, programação, preço/capacidade e propriedade por organizador.
-4. **Registration gratuito:** modelo de estados, idempotência, reservas transacionais, cancelamento e teste concorrente da última vaga.
-5. **Payment:** simulação, expiração, coordenação idempotente e regra para aprovação tardia, com testes de disputa.
-6. **Mensageria:** contratos versionados, outbox, deduplicação, retentativas, fila de falhas e Notification.
-7. **Frontend de negócio:** integração incremental conforme Figma, estados reais, catálogo, gestão e inscrições.
-8. **Entrega:** lista de espera completa, falhas/recuperação, evidências, ADRs restantes e Cloudflare Tunnel.
+Implementado: Docker, Identity/organizações/perfis, recuperação com entrega simulada, Event/programação/publicação, Registration/reservas/fila, Payment simulado e Notification/outbox/RabbitMQ. As telas desenhadas no Figma têm rotas ou componentes correspondentes, respeitando regras de negócio.
+
+Entrega incremental de 03/11/2026: modais de professor/palestrante e atividade integrados ao editor, metadados persistidos no Event e política opcional de lista de espera respeitada pelo Registration. O perfil institucional inclui consulta e edição, e a seleção do responsável oferece busca sobre os palestrantes do evento. O painel sem eventos orienta a criação da primeira programação. A imagem exportada pelo usuário complementa a referência visual obtida pelo Figma. Veja o [recorte, as rotas e os resultados de validação](validation/2026-11-03-organizer.md).
+
+Complementação do participante: catálogo pós-login, Minhas inscrições e checkout em quatro etapas aplicados às imagens exportadas, utilizando preços, prazos e estados reais. Confira as [rotas, as adaptações ao protótipo e a validação](validation/2026-11-03-participant.md).
+
+Entrega de 04/11/2026: novas referências de inscrições/perfil aplicadas com consulta e edição de conta, histórico por término da atividade, cards horizontais, detalhes completos do evento, rodapé participante e logo com transparência. Veja a [comparação e validação das telas de usuário](validation/2026-11-04-participant.md).
+
+1. Consolidar evidências do fluxo completo, concorrência, autorização, expiração e indisponibilidade.
+2. Evoluir gestão de inscrições por organizadores, com contratos e filtros por organização.
+3. Implementar Attendance antes de Certificate: presença válida, check-in sem duplicidade e emissão somente após o evento.
+4. Evoluir Reporting com projeções/eventos, sem acesso SQL a bancos de outros serviços.
+5. Evoluir recuperação para SMTP, revogação de sessões, identidades internas por serviço e rastreabilidade completa.
+6. Preparar demonstração e Cloudflare Tunnel com dados sintéticos após validação local. Nenhum túnel é iniciado automaticamente.
 
 Validar cada entrega antes de avançar. Attendance, Certificate e Reporting permanecem modelados, sem implementação no protótipo inicial.
 

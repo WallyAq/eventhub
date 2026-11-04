@@ -33,8 +33,11 @@ export function createIdentityRouter(url, verify, request = fetch) {
   };
   router.post('/auth/register', forward);
   router.post('/auth/login', forward);
+  router.post('/auth/password/forgot', forward);
+  router.post('/auth/password/reset', forward);
   router.get('/users/me', authenticate, forward);
   router.patch('/users/me', authenticate, forward);
+  router.post('/users/me/password', authenticate, forward);
   router.get('/organizations', authenticate, forward);
   router.post('/organizations', authenticate, forward);
   router.get('/organizations/:id', authenticate, forward);

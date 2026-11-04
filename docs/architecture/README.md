@@ -14,7 +14,7 @@ Acesso externo planejado: Internet → Cloudflare Tunnel no host → Nginx.
 
 O Gateway usa Node.js/Express e não possui banco. Somente Nginx publica porta no host. Um PostgreSQL mantém cinco bancos lógicos, sem isolamento físico. Cada usuário é proprietário de seu banco; CONNECT público é revogado nos cinco bancos de serviço. O administrador é usado apenas na infraestrutura.
 
-RabbitMQ está provisionado com volume e healthcheck; publicação e consumo serão implementados na etapa de eventos assíncronos. Identity possui users, organizations e organization_members, com migrações versionadas no próprio serviço. Os demais serviços ainda possuem somente diagnóstico.
+RabbitMQ recebe eventos da outbox do Registration e entrega ao consumidor Notification, com deduplicação e fila de falhas. Identity possui contas, organizações e recuperação; Event possui programação; Registration possui inventário, inscrições e outbox; Payment possui transações simuladas; Notification possui entregas simuladas. Cada serviço cria tabelas usando apenas seu banco.
 
 Os logs das aplicações incluem serviço, método, caminho, status, duração e requestId. O Nginx cria o identificador e o Gateway o repassa às consultas internas. Não são registrados corpos, senhas ou tokens.
 
@@ -28,7 +28,7 @@ Esses três serviços não possuem containers ou bancos nesta etapa. A implement
 
 ## Próximos limites importantes
 
-Event possui a capacidade configurada. Registration deverá manter reservas e ocupação transacionalmente; não usará contagem de disponibilidade no frontend para decidir reservas. A sincronização de alterações de capacidade precisa de contrato antes da implementação.
+Event possui capacidade e preços fixos após publicação. Registration mantém reservas sob lock transacional por atividade. Frontend não decide disponibilidade. Veja [ADR 004](../adr/004-published-capacity.md) e [ADR 005](../adr/005-payment-outbox.md).
 
-Identity emite JWT RS256 para participantes. Gateway e Identity validam assinatura e claims; /users/me usa o sujeito autenticado. A chave privada fica apenas no Identity. Há cadastro/login públicos, perfil protegido e organizações com vínculos OWNER/ORGANIZER consultados no banco por operação. O vínculo não altera o papel global do JWT. A autorização de eventos será implementada no domínio Event, consumindo informações por API.
+Identity emite JWT RS256; Gateway e Identity validam assinatura/claims. Event consulta vínculos por API; Registration e Payment validam conta e proprietário da operação. Vínculos não alteram papel global do JWT. Callbacks internos exigem credencial interna e não são publicados no Gateway.
 

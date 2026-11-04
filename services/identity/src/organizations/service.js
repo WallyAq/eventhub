@@ -9,7 +9,7 @@ function organizationId(id) {
     throw new UserError(400, 'invalid_input', 'Identificador de organização inválido.');
 }
 function data(body, partial = false) {
-  input(body, ['name', 'description']);
+  input(body, partial ? ['name', 'description', 'cnpj', 'legalName', 'entityType', 'phone', 'email'] : ['name', 'description']);
   if (partial && !Object.keys(body).length) throw new UserError(400, 'invalid_input', 'Informe os dados a alterar.');
   const result = {};
   if (!partial || body.name !== undefined) {
@@ -22,6 +22,25 @@ function data(body, partial = false) {
       throw new UserError(400, 'invalid_input', 'Descrição deve ter até 2000 caracteres.');
     result.description = body.description.trim();
   } else if (!partial) result.description = '';
+  for (const [key, max] of [['legalName',120],['entityType',80],['email',254]]) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== 'string' || body[key].trim().length > max) throw new UserError(400,'invalid_input','Dados institucionais inválidos.');
+    result[key] = body[key].trim();
+  }
+  if (result.email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email)) throw new UserError(400,'invalid_input','E-mail inválido.');
+    result.email = result.email.toLowerCase();
+  }
+  if (body.cnpj !== undefined) {
+    if (typeof body.cnpj !== 'string' || body.cnpj.length > 24) throw new UserError(400,'invalid_input','CNPJ inválido.');
+    result.cnpj = body.cnpj.replace(/[^a-z0-9]/gi,'').toUpperCase();
+    if (!/^[A-Z0-9]{14}$/.test(result.cnpj)) throw new UserError(400,'invalid_input','CNPJ deve ter 14 caracteres.');
+  }
+  if (body.phone !== undefined) {
+    if (typeof body.phone !== 'string' || body.phone.length > 30) throw new UserError(400,'invalid_input','Telefone inválido.');
+    result.phone = body.phone.replace(/\D/g,'');
+    if (result.phone && (result.phone.length < 10 || result.phone.length > 15)) throw new UserError(400,'invalid_input','Telefone inválido.');
+  }
   return result;
 }
 
@@ -40,7 +59,9 @@ export function createOrganizationService(repository) {
     async update(id, userId, body) {
       const values = data(body, true);
       await access(id, userId, true);
-      const organization = await repository.update(id, userId, values);
+      let organization;
+      try { organization = await repository.update(id, userId, values); }
+      catch (error) { if (error.code === '23505') throw new UserError(409,'organization_in_use','Este CNPJ já está cadastrado.'); throw error; }
       if (!organization) throw new UserError(403, 'forbidden', 'Acesso não autorizado.');
       return organization;
     },

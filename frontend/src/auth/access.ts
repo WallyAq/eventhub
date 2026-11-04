@@ -5,7 +5,7 @@ export const accessAreas = {
     label: 'Participante',
     login: '/participante/login',
     register: '/participante/cadastro',
-    destination: '/perfil',
+    destination: '/eventos',
     other: 'organization' as const,
     eyebrow: 'SUA JORNADA COMEÇA AQUI',
     title: 'Acesse sua conta de participante',

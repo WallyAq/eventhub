@@ -1,0 +1,142 @@
+/* Motion is decorative: content and focus never depend on an animation ending. */
+:root {
+  --motion-fast: 160ms;
+  --motion-enter: 260ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+
+:where(button, .primary-button, .secondary-button, .access-action, .topnav > a,
+  .profile-selector a, .account-popover a, .participant-details__back) {
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease,
+    translate var(--motion-fast) var(--motion-ease);
+}
+
+:where(input, select, textarea) {
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+:where(.profile-selector a, .modality-options > label, .activity-kind__options > label,
+  .activity-payment__choices > label, .organization-choice,
+  .participant-checkout__activity, .participant-checkout__methods > label) {
+  transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.participant-checkout__steps li,
+.participant-checkout__steps li > span,
+.participant-checkout__steps li::after {
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.event-group > summary img,
+.speaker-picker__toggle img {
+  transition: transform 180ms var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Only page content enters; fixed navigation and dialog ancestors stay still. */
+  :where(.access-intro, .business-heading, .page-heading,
+    .participant-details__back, .participant-event-list > h2) {
+    animation: eventhub-rise-in 220ms var(--motion-ease) backwards;
+  }
+
+  :where(.figma-card, .access-card, .event-card, .participant-featured-card,
+    .participant-details__activity, .participant-details__speaker,
+    .my-registration-card, .empty-state, .my-registrations-empty) {
+    animation: eventhub-rise-in var(--motion-enter) var(--motion-ease) backwards;
+  }
+
+  /* A bounded stagger keeps long lists responsive and never waits on polling. */
+  :where(.access-options, .events-grid, .participant-details__activities,
+    .participant-details__speakers, .my-registrations-grid) > :nth-child(2) {
+    animation-delay: 35ms;
+  }
+  :where(.events-grid, .participant-details__speakers, .my-registrations-grid) > :nth-child(3) {
+    animation-delay: 70ms;
+  }
+  :where(.events-grid, .my-registrations-grid) > :nth-child(n + 4) {
+    animation-delay: 100ms;
+  }
+
+  /* These panels can contain dialogs: an opacity-only entrance avoids a new
+     positioning context for any fixed descendants. */
+  :where(.business-card, .profile-card, .organization-panel, .filter-bar,
+    .password-section, .participant-profile__card > section > form,
+    .organization-profile__card > section > form) {
+    animation: eventhub-fade-in 220ms ease backwards;
+  }
+
+  .account-popover,
+  .speaker-picker__popup {
+    transform-origin: top right;
+    animation: eventhub-popover-in 180ms var(--motion-ease) backwards;
+  }
+
+  dialog[open]:not(.participant-checkout) {
+    animation: eventhub-dialog-in 220ms var(--motion-ease) backwards;
+  }
+  dialog[open]::backdrop {
+    animation: eventhub-fade-in 180ms ease backwards;
+  }
+  .participant-checkout[open] > .participant-checkout__card {
+    animation: eventhub-dialog-in 240ms var(--motion-ease) backwards;
+  }
+  .participant-checkout__body[data-motion-step] {
+    animation: eventhub-fade-in 200ms ease backwards;
+  }
+  .participant-checkout__activity {
+    animation: eventhub-rise-in 220ms var(--motion-ease) backwards;
+  }
+  .participant-checkout__activity:nth-of-type(2) { animation-delay: 35ms; }
+  .participant-checkout__activity:nth-of-type(n + 3) { animation-delay: 70ms; }
+
+  :where(.success, .error, .participant-checkout__result) {
+    animation: eventhub-fade-in 180ms ease backwards;
+  }
+
+  :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):active {
+    translate: 0 1px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):hover {
+      translate: 0 -1px;
+      box-shadow: 0 4px 10px #3525cd1a;
+    }
+    :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):active {
+      translate: 0 1px;
+    }
+  }
+}
+
+@keyframes eventhub-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes eventhub-rise-in {
+  from { opacity: 0; translate: 0 8px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes eventhub-popover-in {
+  from { opacity: 0; translate: 0 -4px; scale: .985; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes eventhub-dialog-in {
+  from { opacity: 0; translate: 0 8px; scale: .99; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, *::backdrop {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

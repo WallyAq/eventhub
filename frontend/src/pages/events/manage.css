@@ -1,0 +1,17 @@
+.manage-events .manage-first-event{display:flex;align-items:center;flex-direction:column;text-align:center;padding:56px 24px;border:1px solid var(--border);border-radius:8px;background:white;box-shadow:0 1px 2px #0000000d;margin-top:24px}
+.manage-first-event__icon{display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:50%;background:#f3f2ff;margin-bottom:20px}
+.manage-first-event__icon img{width:27px;height:auto}
+.manage-first-event h3{font-size:20px;line-height:28px;font-weight:600;margin:0 0 10px;letter-spacing:-.1px}
+.manage-first-event p{max-width:520px;font-size:14px;line-height:22px;color:#464555;margin:0 0 24px}
+.manage-first-event .primary-button{padding:12px 20px;border-radius:4px}
+.manage-events .manage-onboarding{margin-top:32px;padding-top:24px;border-top:1px solid #c7c4d866}
+.manage-events .manage-onboarding h2{font-size:18px;line-height:26px;font-weight:600;letter-spacing:0;margin:0 0 20px}
+.manage-onboarding ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;list-style:none;padding:0;margin:0}
+.manage-onboarding li{display:flex;align-items:flex-start;gap:12px;padding:20px;background:white;border:1px solid #c7c4d880;border-radius:8px;min-width:0}
+.manage-onboarding__step{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;background:#e9edff;border-radius:50%;color:var(--primary-text);font-size:13px;line-height:20px;font-weight:600}
+.manage-onboarding li>div{min-width:0}
+.manage-onboarding h3{font-size:14px;line-height:20px;font-weight:600;margin:0 0 6px;overflow-wrap:anywhere}
+.manage-onboarding p{font-size:13px;line-height:20px;color:#464555;margin:0}
+.manage-events .manage-search-empty{background:white}
+@media(max-width:850px){.manage-onboarding ol{grid-template-columns:1fr;gap:12px}.manage-onboarding li{padding:16px}}
+@media(max-width:600px){.manage-events .manage-first-event{padding:36px 20px}.manage-first-event h3{font-size:18px;line-height:26px}.manage-first-event p{font-size:13px;line-height:20px}.manage-first-event .primary-button{width:100%}.manage-events .manage-onboarding h2{font-size:17px;line-height:24px}.manage-events .manage-onboarding{margin-top:24px;padding-top:20px}}

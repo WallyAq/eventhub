@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { AuthLayout } from '../components/AuthLayout';
+import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError, errorMessage } from '../services/identity';
 import { addMember, createOrganization, getOrganization, listMembers, listOrganizations, updateOrganization } from '../services/organizations';
@@ -78,10 +78,10 @@ export function OrganizationsPage() {
     } catch (error) { handleError(error); }
     finally { setBusy(false); }
   }
-  return <AuthLayout area="organization"><section className="status-panel auth-panel organization-panel" aria-labelledby="organizations-title">
+  return <AppLayout area="organization"><main className="organizations-main"><section className="status-panel auth-panel organization-panel" aria-labelledby="organizations-title">
     <span className="eyebrow">ESPAÇO DO ORGANIZADOR</span><h2 id="organizations-title">Minhas organizações</h2>
     <p>Crie sua organização ou acesse aquelas das quais você faz parte.</p>
-    <Link to="/perfil">Meu perfil pessoal</Link>
+    <Link to="/organizacao/perfil">Perfil da organização</Link>
     <button type="button" className="secondary-button" disabled={busy} onClick={() => signOut()}>Sair da área da organização</button>
     {error && <p className="error" role="alert">{error}</p>}
     {notice && <p className="success" role="status">{notice}</p>}
@@ -94,6 +94,7 @@ export function OrganizationsPage() {
     {detailsLoading && <p role="status">Carregando detalhes…</p>}
     {selected && <section className="organization-section" aria-labelledby="organization-details">
       <h3 id="organization-details">{selected.name}</h3>
+      <Link to={'/organizacao/perfil/' + selected.id}>Ver dados institucionais</Link>
       {selected.membershipRole === 'OWNER' ? <form onSubmit={save}><fieldset disabled={busy}>
         <label htmlFor="org-name">Nome da organização</label><input id="org-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} />
         <label htmlFor="org-description">Descrição</label><textarea id="org-description" maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} />
@@ -115,6 +116,6 @@ export function OrganizationsPage() {
         <button type="submit">{busy ? 'Aguarde…' : 'Criar organização'}</button>
       </fieldset></form>
     </section>
-  </section></AuthLayout>;
+  </section></main></AppLayout>;
 }
 

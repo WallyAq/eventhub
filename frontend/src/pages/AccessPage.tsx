@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { accessAreas } from '../auth/access';
+import { Brand } from '../components/Brand';
 
 export function AccessPage() {
   return <div className="shell access-shell">
-    <header><Link className="brand" to="/">event<span>hub</span><span className="brand-dot">●</span></Link><span className="environment">Eventos acadêmicos e profissionais</span></header>
+    <header><Brand /><span className="environment">Eventos acadêmicos e profissionais</span></header>
     <main className="access-main">
       <section className="access-intro"><span className="eyebrow">BEM-VINDO AO EVENTHUB</span><h1>Como você quer entrar?</h1><p>Escolha seu espaço para continuar.</p></section>
       <div className="access-options">

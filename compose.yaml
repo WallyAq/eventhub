@@ -85,6 +85,8 @@ services:
       PGUSER: event_user
       PGDATABASE: event_db
       PGPASSWORD: ${EVENT_DB_PASSWORD:?Defina EVENT_DB_PASSWORD no .env}
+      IDENTITY_URL: http://identity:3000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,6 +101,12 @@ services:
       PGUSER: registration_user
       PGDATABASE: registration_db
       PGPASSWORD: ${REGISTRATION_DB_PASSWORD:?Defina REGISTRATION_DB_PASSWORD no .env}
+      IDENTITY_URL: http://identity:3000
+      EVENTS_URL: http://events:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+      RESERVATION_TTL_SECONDS: ${RESERVATION_TTL_SECONDS:-900}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,6 +121,9 @@ services:
       PGUSER: payment_user
       PGDATABASE: payment_db
       PGPASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD no .env}
+      IDENTITY_URL: http://identity:3000
+      REGISTRATIONS_URL: http://registrations:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,6 +138,8 @@ services:
       PGUSER: notification_user
       PGDATABASE: notification_db
       PGPASSWORD: ${NOTIFICATION_DB_PASSWORD:?Defina NOTIFICATION_DB_PASSWORD no .env}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy

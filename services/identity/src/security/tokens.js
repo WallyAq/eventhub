@@ -5,17 +5,17 @@ export async function createTokens(privateBase64, publicBase64) {
   const privateKey = await importPKCS8(Buffer.from(privateBase64, 'base64').toString(), 'RS256');
   const publicKey = await importSPKI(Buffer.from(publicBase64, 'base64').toString(), 'RS256');
   return {
-    expiresIn: 900,
+    expiresIn: 3600,
     async issue(user) {
       return new SignJWT({ role: user.role })
         .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
         .setIssuer('eventhub-identity').setAudience('eventhub-api')
-        .setSubject(user.id).setIssuedAt().setExpirationTime('15m').sign(privateKey);
+        .setSubject(user.id).setIssuedAt().setExpirationTime('1h').sign(privateKey);
     },
     async verify(token) {
       const { payload } = await jwtVerify(token, publicKey, {
         algorithms: ['RS256'], issuer: 'eventhub-identity', audience: 'eventhub-api',
-        requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '15m',
+        requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '1h',
       });
       if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || payload.role !== 'PARTICIPANT') throw new Error('Invalid claims');
       return payload;

@@ -1,0 +1,9 @@
+.participant-shell{display:flex;flex-direction:column}
+.participant-shell>main{flex:1;width:100%}
+.participant-shell .topbar{gap:32px}
+.participant-shell .topnav>a{font-weight:500}
+.participant-shell .account-trigger{padding-left:8px}
+.participant-footer{margin-top:32px;border-top:1px solid var(--border);background:white}
+.participant-footer__content{display:flex;justify-content:space-between;align-items:center;gap:24px;max-width:1600px;min-height:136px;width:100%;margin:auto;padding:32px}
+.participant-footer p{font-size:13px;line-height:22px;color:#464555;margin:0;text-align:right}
+@media(max-width:700px){.participant-shell .topbar{gap:12px}.participant-shell .topnav{gap:24px}.participant-shell .topnav>a{min-height:36px}.participant-footer{margin-top:24px}.participant-footer__content{padding:24px 16px;min-height:120px;flex-direction:column;align-items:flex-start;gap:16px}.participant-footer p{text-align:left;font-size:12px}}
