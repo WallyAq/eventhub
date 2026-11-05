@@ -13,6 +13,7 @@ import { RecoveryPage } from './pages/RecoveryPage';
 import { CatalogPage } from './pages/events/CatalogPage';
 import { ManageEventsPage } from './pages/events/ManagePage';
 import { EventEditorPage } from './pages/events/EditorPage';
+import { OrganizerEventPage } from './pages/events/OrganizerEventPage';
 import { EventDetailsPage } from './pages/events/DetailsPage';
 import { CheckoutPage } from './pages/registrations/CheckoutPage';
 import { MyRegistrationsPage } from './pages/registrations/MyRegistrationsPage';
@@ -40,6 +41,7 @@ export default function App() {
     <Route path="/organizacao/eventos" element={<ManageEventsPage />} />
     <Route path="/organizacao/eventos/novo" element={<EventEditorPage key="new" />} />
     <Route path="/organizacao/eventos/:id" element={<EventEditorPage />} />
+    <Route path="/organizacao/eventos/:id/gestao" element={<OrganizerEventPage />} />
     <Route path="/atividades/:eventId/:activityId/inscricao" element={<CheckoutPage />} />
     <Route path="/pagamento/:id" element={<CheckoutPage />} />
     <Route path="/inscricoes/:id" element={<CheckoutPage />} />

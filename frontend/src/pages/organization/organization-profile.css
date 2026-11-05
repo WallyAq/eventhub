@@ -13,7 +13,7 @@
 .organization-profile__readout dd{font-size:14px;line-height:20px;font-weight:600;color:#141b2b;margin:0;overflow-wrap:anywhere}
 .organization-profile__readout p{font-size:12px;line-height:20px;color:#777587;margin:6px 0 0}
 .organization-profile__footer{display:flex;justify-content:flex-end;gap:12px;flex-wrap:wrap;background:#f9f9ff;border-top:1px solid #e1e8fd;padding:16px 32px}
-.organization-profile__footer--readout{padding-top:0;padding-bottom:0}
+.organization-profile__footer--readout{padding-top:20px;padding-bottom:20px}
 .organization-profile__footer--readout>.primary-button{min-width:180px}
 .organization-profile__footer .secondary-button,.organization-profile__footer .primary-button,.organization-profile__security .secondary-button{min-height:40px;font-size:14px;line-height:20px;border-radius:4px;font-weight:500;padding:9px 16px}
 .organization-profile__feedback{padding:0 32px;margin:0 0 24px}

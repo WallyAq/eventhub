@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError, errorMessage } from '../services/identity';
 import { addMember, createOrganization, getOrganization, listMembers, listOrganizations, updateOrganization } from '../services/organizations';
 import type { Organization, OrganizationMember } from '../types/organizations';
+import './organizations.css';
 
 export function OrganizationsPage() {
   const { session, signOut } = useAuth();
@@ -79,10 +80,12 @@ export function OrganizationsPage() {
     finally { setBusy(false); }
   }
   return <AppLayout area="organization"><main className="organizations-main"><section className="status-panel auth-panel organization-panel" aria-labelledby="organizations-title">
-    <span className="eyebrow">ESPAÇO DO ORGANIZADOR</span><h2 id="organizations-title">Minhas organizações</h2>
+    <header className="organizations-heading"><span className="eyebrow">ESPAÇO DO ORGANIZADOR</span><h2 id="organizations-title">Minhas organizações</h2>
     <p>Crie sua organização ou acesse aquelas das quais você faz parte.</p>
-    <Link to="/organizacao/perfil">Perfil da organização</Link>
+    </header>
+    <div className="organizations-actions"><Link className="secondary-button" to="/organizacao/perfil">Perfil da organização</Link>
     <button type="button" className="secondary-button" disabled={busy} onClick={() => signOut()}>Sair da área da organização</button>
+    </div>
     {error && <p className="error" role="alert">{error}</p>}
     {notice && <p className="success" role="status">{notice}</p>}
     {loading ? <p role="status">Carregando organizações…</p> : organizations.length === 0 ? <p>Você ainda não faz parte de uma organização.</p> :

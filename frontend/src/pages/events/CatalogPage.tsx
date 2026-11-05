@@ -41,7 +41,7 @@ export function EventCard({ event, managed = false }: { event: EventData; manage
     </div>
     {!managed && <p className="event-price">{eventPrice(event)}</p>}
     <div className="card-actions">{managed
-      ? <Link className="primary-button" to={'/organizacao/eventos/' + event.id}>Gerenciar Evento</Link>
+      ? <Link className="primary-button" to={'/organizacao/eventos/' + event.id + '/gestao'}>Gerenciar Evento</Link>
       : <><Link className="primary-button" to={'/eventos/' + event.id + '/inscricao'}>Inscreva-se</Link><Link className="secondary-button" to={'/eventos/' + event.id}>Detalhes do Evento</Link></>}
     </div>
   </article>;
