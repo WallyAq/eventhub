@@ -4,11 +4,13 @@ Plataforma acadêmica da UECE para gerenciamento de eventos, com microsserviços
 
 ## Estado atual
 
-O backend acadêmico possui oito serviços com bancos próprios: Identity, Event, Registration, Payment, Notification, Attendance, Certificate e Reporting. Inclui gestão de inscritos, reservas/fila, presença, certificados PDF e relatórios com projeções próprias. As integrações usam APIs e RabbitMQ, sem SQL entre bancos de domínio. O pagamento permanece simulado, conforme o escopo escolhido.
+O backend acadêmico possui oito serviços com bancos próprios: Identity, Event, Registration, Payment, Notification, Attendance, Certificate e Reporting. Inclui gestão de inscritos, reservas/fila, presença, certificados PDF e relatórios com projeções próprias. As integrações usam APIs e RabbitMQ, sem SQL entre bancos de domínio. O pagamento permanece simulado, conforme o escopo escolhido, usando um provedor externo fictício em processo e banco separados. Veja [RF07/provedor](docs/api/payment-provider.md), [RF08/notificações](docs/api/notifications.md) e [SMTP](docs/deployment/smtp.md).
 
 Veja a [implementação e validação do backend acadêmico](docs/validation/2026-11-04-backend-implemented.md), com resultados dos testes e próximas integrações visuais.
 
-O participante possui catálogo, aviso antecipado de inscrição existente, checkout, perfil e Minhas inscrições. A ação de certificado solicita e baixa o PDF autenticado, com requisitos decididos pelo servidor. Gestão de inscritos, check-in, relatórios e confirmação de e-mail estão disponíveis pelas APIs; suas novas telas organizadoras e a tela de confirmação ainda precisam de integração visual. Diagnóstico em /diagnostico. Veja [negócio](docs/api/business.md), [presença](docs/api/attendance.md), [certificados](docs/api/certificates.md) e [relatórios](docs/api/reporting.md).
+A [validação de RF07 e RF08](docs/validation/2026-11-06-payments-notifications.md) detalha o provedor simulado separado, os avisos de pagamento/evento e os limites da entrega SMTP.
+
+O participante possui catálogo, aviso antecipado de inscrição existente, checkout, perfil e Minhas inscrições. A ação de certificado solicita e baixa o PDF autenticado, com requisitos decididos pelo servidor. A gestão do organizador inclui inscritos, check-in por câmera/imagem de QR, modelos de certificado com fundo e assinaturas visuais, lotes/categorias por atividade e emissão automática para palestrantes. Veja o [guia dos novos recursos](docs/validation/2026-11-06-organizer-features.md). Relatórios e confirmação de e-mail continuam disponíveis pelas APIs; suas telas dedicadas ainda precisam de integração visual. Diagnóstico em /diagnostico. Veja [negócio](docs/api/business.md), [presença](docs/api/attendance.md), [certificados](docs/api/certificates.md) e [relatórios](docs/api/reporting.md).
 
 Consulte a [revisão visual e lista de páginas/popups](docs/validation/2026-10-30-visual-review.md) para rotas, correções e validação em desktop e celular.
 
@@ -62,6 +64,7 @@ node --test tests/integration/organizations.test.mjs
 node --test tests/integration/figma-identity.test.mjs
 node --test tests/integration/business.test.mjs
 node --test tests/integration/backend-completion.test.mjs
+node --test tests/integration/payments-notifications.test.mjs
 ```
 
 Os testes verificam Nginx → Gateway → aplicações Node/Python → bancos, respostas 404, rastreabilidade e isolamento dos oito usuários de banco (64 combinações de CONNECT). A integração de conclusão cobre gestão, presença, PDF, privacidade da validação, projeções, replay RabbitMQ, sessões e e-mail. Usa apenas contas/eventos sintéticos; a passagem do tempo é simulada nos registros da própria fixture usando cada domínio e seu banco. A verificação de permissões utiliza `docker compose exec`. Resultados da rodada devem ser separados de testes de interface com respostas controladas.
@@ -82,6 +85,8 @@ Testes unitários Node, após `npm ci` no diretório correspondente:
 npm --prefix gateway test
 npm --prefix services/identity test
 npm --prefix services/payments test
+npm --prefix services/payment-provider test
+node --test tests/config/bootstrap.test.mjs
 ```
 
 ## Desenvolvimento do frontend
@@ -95,6 +100,8 @@ npm run dev
 ```
 
 O Vite informa a URL local e encaminha `/api` para o Nginx na porta 8080. Se mudar HTTP_PORT, ajuste o alvo em `vite.config.ts`. Para validar tipos e gerar a versão de produção: `npm run build`.
+
+O provedor fictício usa o banco adicional `provider_db` e credencial própria, sem publicar portas. A provisão inclui esse banco em volumes existentes sem apagar dados.
 
 Cada aplicação Node possui seu próprio `package-lock.json`. As dependências Python estão fixadas em seu respectivo `requirements.txt`; os containers usam ambientes isolados.
 
@@ -118,7 +125,9 @@ O pagamento é simulado, sem cobrança ou coleta de cartão. Backups/restauraç�
 
 Veja [arquitetura](docs/architecture/README.md), [organização do código](docs/architecture/repository-structure.md), [diagnóstico](docs/api/health.md), [API de identidade](docs/api/identity.md), [decisão de autenticação](docs/adr/002-identity-authentication.md) e [plano](docs/PLAN.md).
 
-## Cloudflare Tunnel
+## Acesso externo com ngrok
 
-O cloudflared já está instalado no computador. Depois de validar localmente, um túnel temporário poderá apontar para `http://localhost:8080`. Nenhum túnel é iniciado automaticamente. Autenticação e regras de acesso devem ser implementadas antes da demonstração com dados pessoais.
+O endereço definido para a demonstração é `https://undaunted-bargraph-freebie.ngrok-free.dev`, encaminhado para `http://localhost:8080`. Sua disponibilidade depende do computador ligado, Docker e ngrok em execução. Este repositório não inicia o túnel automaticamente nem comprova que o endereço esteja online.
+
+Veja o [guia de ngrok no Windows](docs/deployment/ngrok-windows.md) para iniciar manualmente, manter o mesmo endereço ao reiniciar, migrar para outro computador preservando os bancos e configurar um serviço Windows opcional.
 

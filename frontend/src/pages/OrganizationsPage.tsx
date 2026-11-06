@@ -1,3 +1,4 @@
+import { RequiredMark } from '../components/form/RequiredMark';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
@@ -99,14 +100,14 @@ export function OrganizationsPage() {
       <h3 id="organization-details">{selected.name}</h3>
       <Link to={'/organizacao/perfil/' + selected.id}>Ver dados institucionais</Link>
       {selected.membershipRole === 'OWNER' ? <form onSubmit={save}><fieldset disabled={busy}>
-        <label htmlFor="org-name">Nome da organização</label><input id="org-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} />
+        <label htmlFor="org-name">Nome da organização<RequiredMark /></label><input id="org-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} />
         <label htmlFor="org-description">Descrição</label><textarea id="org-description" maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} />
         <button type="submit">{busy ? 'Aguarde…' : 'Salvar organização'}</button>
       </fieldset></form> : <p>{selected.description || 'Sem descrição.'}</p>}
       <h3>Equipe</h3>
       <ul className="member-list">{members.map(member => <li key={member.id}><strong>{member.name}</strong><span>{member.email}</span><small>{member.role === 'OWNER' ? 'Responsável' : 'Organizador'}</small></li>)}</ul>
       {selected.membershipRole === 'OWNER' && <form onSubmit={invite}><fieldset disabled={busy}>
-        <label htmlFor="member-email">Adicionar organizador pelo e-mail</label>
+        <label htmlFor="member-email">Adicionar organizador pelo e-mail<RequiredMark /></label>
         <input id="member-email" type="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} aria-describedby="member-hint" />
         <small id="member-hint">A pessoa precisa ter uma conta cadastrada. A adição concede acesso imediato à organização.</small>
         <button type="submit">{busy ? 'Aguarde…' : 'Adicionar organizador'}</button>
@@ -114,7 +115,7 @@ export function OrganizationsPage() {
     </section>}
     <section className="organization-section" aria-labelledby="new-org-title"><h3 id="new-org-title">Criar organização</h3>
       <form onSubmit={create}><fieldset disabled={busy || loading || detailsLoading}>
-        <label htmlFor="new-org-name">Nome</label><input id="new-org-name" required minLength={2} maxLength={120} value={newName} onChange={e => setNewName(e.target.value)} />
+        <label htmlFor="new-org-name">Nome<RequiredMark /></label><input id="new-org-name" required minLength={2} maxLength={120} value={newName} onChange={e => setNewName(e.target.value)} />
         <label htmlFor="new-org-description">Descrição (opcional)</label><textarea id="new-org-description" maxLength={2000} value={newDescription} onChange={e => setNewDescription(e.target.value)} />
         <button type="submit">{busy ? 'Aguarde…' : 'Criar organização'}</button>
       </fieldset></form>

@@ -15,9 +15,9 @@ Acesso externo planejado: Internet → Cloudflare Tunnel no host → Nginx.
 | Certificate | Python / FastAPI | certificate_db | certificate_user |
 | Reporting | Python / FastAPI | reporting_db | reporting_user |
 
-O Gateway usa Node.js/Express e não possui banco. Somente Nginx publica porta no host. Um PostgreSQL mantém oito bancos lógicos, sem isolamento físico. Cada usuário é proprietário de seu banco; CONNECT público é revogado nos oito bancos de serviço. O administrador é usado apenas na infraestrutura. A provisão idempotente adiciona domínios a volumes existentes sem apagar dados.
+O Gateway usa Node.js/Express e não possui banco. Somente Nginx publica porta no host. Um PostgreSQL mantém oito bancos lógicos de domínio e um banco adicional do provedor fictício, sem isolamento físico. Cada usuário é proprietário de seu banco; CONNECT público é revogado nos oito bancos de serviço. O administrador é usado apenas na infraestrutura. A provisão idempotente adiciona domínios a volumes existentes sem apagar dados.
 
-RabbitMQ recebe eventos da outbox do Registration e entrega ao consumidor Notification, com deduplicação e fila de falhas. Identity possui contas, organizações e recuperação; Event possui programação; Registration possui inventário, inscrições e outbox; Payment possui transações simuladas; Notification possui entregas simuladas. Cada serviço cria tabelas usando apenas seu banco.
+RabbitMQ recebe eventos da outbox do Registration e entrega ao consumidor Notification, com deduplicação e fila de falhas. Identity possui contas, organizações e recuperação; Event possui programação; Registration possui inventário, inscrições e outbox; Payment possui transações simuladas; Notification possui entregas por mailbox ou SMTP. O provedor fictício é uma dependência HTTP separada do Payment, com banco e credencial próprios, sem porta publicada. Cada serviço cria tabelas usando apenas seu banco.
 
 Os logs das aplicações incluem serviço, método, caminho, status, duração e requestId. O Nginx cria o identificador e o Gateway o repassa às consultas internas. Não são registrados corpos, senhas ou tokens.
 

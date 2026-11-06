@@ -11,7 +11,7 @@ import psycopg
 from psycopg.rows import dict_row
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter()
 
@@ -21,10 +21,12 @@ def db():
                            options="-c statement_timeout=10000")
 
 
-def remote(service, path, authorization=""):
+def remote(service, path, authorization="", body=None):
     headers = {"authorization": authorization, "x-internal-key": os.environ["INTERNAL_API_KEY"]}
     try:
-        req = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers)
+        headers["content-type"] = "application/json"
+        req = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers,
+                                     data=None if body is None else json.dumps(body).encode())
         with urllib.request.urlopen(req, timeout=5) as response:
             return json.load(response)
     except urllib.error.HTTPError as error:
@@ -97,6 +99,22 @@ def eligible_activity(registration, event, now=None):
 class CheckIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     registrationId: UUID
+
+
+class CredentialInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    eventId: UUID
+    activityId: UUID | None = None
+    credential: str = Field(min_length=100, max_length=200)
+
+
+@router.post("/attendance/credentials/resolve")
+def resolve(value: CredentialInput, authorization: str = Header(default="")):
+    event = event_detail(value.eventId, authorization, managed=True)
+    registration = remote("REGISTRATIONS", "/internal/registrations/resolve-credential", body=value.model_dump(mode="json"))["registration"]
+    eligible_activity(registration, event)
+    user = remote("IDENTITY", "/internal/users/" + registration["userId"])["user"]
+    return {"registration": {**registration, "participant": {"name": user["name"], "email": user["email"]}}, "attendance": attendance_for(registration["id"])}
 
 
 @router.post("/attendance/check-ins")

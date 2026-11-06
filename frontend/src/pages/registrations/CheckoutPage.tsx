@@ -1,3 +1,4 @@
+import { CheckInCode } from '../../components/events/CheckInCode';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -9,10 +10,11 @@ import { useEventAvailability } from '../../services/availability';
 import { ActivitySeats } from '../../components/events/ActivitySeats';
 import { activeRegistration, registrationAction, useEventRegistrations } from '../../services/eventRegistrations';
 import { ExistingRegistrationNotice } from '../../components/events/ExistingRegistrationNotice';
+import { RequiredMark } from '../../components/form/RequiredMark';
 import './checkout.css';
 
 type Step = 1 | 2 | 3 | 4;
-type Outcome = 'APPROVED' | 'DECLINED';
+type Outcome = 'APPROVED' | 'DECLINED' | 'EXPIRED';
 type ReservationState = { registration: Registration; payment?: Payment | null; warning?: string };
 function stored(key: string) { try { return sessionStorage.getItem(key); } catch { return null; } }
 function remember(key: string, value: string | null) {
@@ -49,6 +51,7 @@ export function CheckoutPage() {
   const attempts = useRef(new Map<string, string>());
   const [eventData, setEvent] = useState<EventData | null>(null), [registrationData, setRegistration] = useState<Registration | null>(null);
   const [payment, setPayment] = useState<Payment | null>(null), [selectedId, setSelectedId] = useState(activityId || '');
+  const [priceOptionId, setPriceOptionId] = useState('');
   const [step, setStep] = useState<Step>(id ? 3 : 1), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [error, setError] = useState(''), [warning, setWarning] = useState(''), [copied, setCopied] = useState(false);
   const [alreadyRegisteredId, setAlreadyRegisteredId] = useState<string | null>(null);
@@ -112,7 +115,7 @@ export function CheckoutPage() {
         if (id) {
           const savedOutcome = stored('eventhub-payment-attempt:' + id);
           if (active) {
-            const previous = savedOutcome === 'APPROVED' || savedOutcome === 'DECLINED' ? savedOutcome : null;
+            const previous = savedOutcome === 'APPROVED' || savedOutcome === 'DECLINED' || savedOutcome === 'EXPIRED' ? savedOutcome : null;
             setRequestedOutcome(previous); setOutcome(previous || 'APPROVED');
           }
           const state = await readReservation(token!, id);
@@ -142,6 +145,12 @@ export function CheckoutPage() {
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   useEffect(() => { const body = dialog.current?.querySelector('.participant-checkout__body'); if (body) body.scrollTop = 0; }, [step]);
   const activity = registration?.activity || event?.activities.find(item => item.id === selectedId);
+  useEffect(() => { setPriceOptionId(''); }, [selectedId, routeIdentity]);
+  const rates = activity?.priceOptions || [];
+  const activeRates = rates.filter(rate => new Date(rate.startsAt).getTime() <= now && now < new Date(rate.endsAt).getTime());
+  const selectedRate = activeRates.find(rate => rate.id === priceOptionId);
+  const quoteMissing = !registration && rates.length > 0 && !selectedRate;
+  const quotedPrice = registration?.priceCents ?? selectedRate?.priceCents ?? activity?.priceCents ?? 0;
   const existingActivity = activity ? existingRegistrations.activities.get(activity.id) : undefined;
   const selectedExisting = existingActivity && activeRegistration(existingActivity, now) ? existingActivity : undefined;
   const expiresAt = registration?.expiresAt ? new Date(registration.expiresAt).getTime() : NaN;
@@ -164,9 +173,10 @@ export function CheckoutPage() {
     if (registration) { setStep(registration.status === 'PENDING_PAYMENT' ? 3 : 4); return; }
     if (!event) return;
     if (selectedExisting) { displayExisting(selectedExisting); return; }
+    if (quoteMissing) { setError('Selecione um lote e uma categoria disponíveis.'); return; }
     if (existingRegistrations.loading || existingRegistrations.failed) return;
     const request = startOperation(); setWarning('');
-    const storageKey = `eventhub-reservation-attempt:${session.user.id}:${event.id}:${activity.id}`;
+    const storageKey = `eventhub-reservation-attempt:${session.user.id}:${event.id}:${activity.id}:${priceOptionId || 'base'}`;
     let key = attempts.current.get(storageKey) || stored(storageKey);
     if (!key) key = crypto.randomUUID();
     attempts.current.set(storageKey, key); remember(storageKey, key);
@@ -178,7 +188,7 @@ export function CheckoutPage() {
       const existing = registrations.find(value => value.userId === session.user.id && value.eventId === event.id && value.activityId === activity.id && activeRegistration(value));
       if (existing) { remember(storageKey, null); attempts.current.delete(storageKey); displayExisting(existing); return; }
       attempted = true;
-      const value = await reserve(session.token, event.id, activity.id, key);
+      const value = await reserve(session.token, event.id, activity.id, key, selectedRate?.id);
       remember(storageKey, null); attempts.current.delete(storageKey);
       if (request.isCurrent()) displayReservation(value);
     } catch (error) {
@@ -249,7 +259,7 @@ export function CheckoutPage() {
     {pending && countdown !== null ? <p className="participant-checkout__clock"><Icon file="9264c" />Reserva: <strong>{countdown} min</strong></p> : <span />}
     <div className="participant-checkout__buttons">
       {step === 1 && <><Link className="secondary-button" to={closePath}>Cancelar</Link><button className="primary-button" disabled={!activity || loading || busy || existingRegistrations.loading || existingRegistrations.failed} onClick={() => selectedExisting ? displayExisting(selectedExisting) : setStep(2)}>{selectedExisting ? registrationAction(selectedExisting) : 'Continuar'}</button></>}
-      {step === 2 && <><button className="secondary-button" disabled={busy} onClick={() => registration ? navigate(closePath) : setStep(1)}>Voltar</button><button className="primary-button" disabled={!activity || busy || (!registration && (existingRegistrations.loading || existingRegistrations.failed))} onClick={confirm}>{busy ? 'Verificando inscrição…' : selectedExisting ? registrationAction(selectedExisting) : registration ? 'Continuar' : 'Confirmar e Continuar'}</button></>}
+      {step === 2 && <><button className="secondary-button" disabled={busy} onClick={() => registration ? navigate(closePath) : setStep(1)}>Voltar</button><button className="primary-button" disabled={!activity || busy || (!selectedExisting && quoteMissing) || (!registration && (existingRegistrations.loading || existingRegistrations.failed))} onClick={confirm}>{busy ? 'Verificando inscrição…' : selectedExisting ? registrationAction(selectedExisting) : registration ? 'Continuar' : 'Confirmar e Continuar'}</button></>}
       {step === 3 && <><button className="secondary-button" disabled={busy} onClick={() => setStep(2)}>Voltar</button><button className="primary-button" disabled={busy || loading || !pending || seconds === 0 || paymentPending} onClick={pay}>{busy ? 'Processando…' : paymentPending ? 'Aguardando confirmação' : 'Simular pagamento'}</button></>}
       {step === 4 && <Link className="primary-button" to="/minhas-inscricoes">Minhas inscrições</Link>}
     </div>
@@ -269,16 +279,16 @@ export function CheckoutPage() {
         </label>)}</fieldset><p className="participant-checkout__note">A disponibilidade será verificada ao confirmar os dados. A reserva e seu prazo só começam quando uma vaga é reservada pelo sistema.</p></>}
         {step === 2 && activity && <><div className="participant-checkout__selection"><p><strong>Atividade selecionada:</strong> {activity.title}</p>{!registration && <button className="text-button" onClick={() => setStep(1)}>Alterar</button>}</div><p className="participant-checkout__instruction">Confira seus dados pessoais para a inscrição:</p>
           <div className="participant-checkout__personal"><label className="wide">Nome Completo<input readOnly value={session?.user.name || ''} /></label><label>E-mail<input readOnly value={session?.user.email || ''} /></label><label>CPF<input readOnly value={maskedCpf(session?.user.cpf)} /></label><label>Telefone<input readOnly value={session?.user.phone || 'Não informado'} /></label><label>Perfil de acesso<input readOnly value="Participante" /></label></div>
-          <p className="participant-checkout__note">Se precisar atualizar seus dados, acesse <Link to="/perfil">Editar perfil</Link> e retorne à inscrição.</p><p className="participant-checkout__note">{activity.priceCents ? 'Atividades pagas só são confirmadas após a aprovação do pagamento simulado.' : 'A atividade gratuita será confirmada se houver disponibilidade.'} {activity.waitlistEnabled !== false ? 'Se as vagas estiverem ocupadas, você poderá entrar na lista de espera.' : 'Esta atividade não possui lista de espera.'}</p></>}
+          <div className="participant-checkout__payment-result">{!registration && rates.length > 0 && <><label htmlFor="checkout-rate">Lote e categoria de preço<RequiredMark /></label><select id="checkout-rate" required value={priceOptionId} disabled={busy} onChange={e => setPriceOptionId(e.target.value)}><option value="">Selecione uma opção</option>{activeRates.map(rate => <option key={rate.id} value={rate.id}>{rate.lotName} · {rate.category} · {money(rate.priceCents)}</option>)}</select>{!activeRates.length && <p className="error" role="status">Nenhum lote está aberto para inscrição neste momento.</p>}<p className="participant-checkout__note">Selecione a categoria correspondente ao seu perfil. O preço e o período do lote serão conferidos pelo servidor ao reservar.</p></>}{!quoteMissing && <p><strong>Valor da inscrição: {money(quotedPrice)}</strong>{registration?.priceOption && <> · {registration.priceOption.lotName} · {registration.priceOption.category}</>}</p>}</div><p className="participant-checkout__note">Se precisar atualizar seus dados, acesse <Link to="/perfil">Editar perfil</Link> e retorne à inscrição.</p><p className="participant-checkout__note">{quotedPrice ? 'Atividades pagas só são confirmadas após a aprovação do pagamento simulado.' : 'A atividade gratuita será confirmada se houver disponibilidade.'} {activity.waitlistEnabled !== false ? 'Se as vagas estiverem ocupadas, você poderá entrar na lista de espera.' : 'Esta atividade não possui lista de espera.'}</p></>}
         {step === 3 && registration && activity && <><p className="participant-checkout__instruction">Resumo da sua inscrição e pagamento:</p><section className="participant-checkout__summary" aria-label="Resumo da inscrição"><div><small>Evento principal</small><strong>{registration.eventTitle}</strong></div><div><small>Atividade selecionada</small><strong>{activity.title}</strong></div><div className="participant-checkout__total"><strong>Total a pagar:</strong><strong>{money(registration.priceCents)}</strong></div></section>
           <p className={'status-badge status-' + registration.status} role="status">{statusLabel[registration.status]}</p>{payment && <p className="participant-checkout__note">Pagamento: <strong>{statusLabel[payment.status]}</strong>{payment.status === 'APPROVED' && pending ? '. Aguardando a confirmação da inscrição pelo serviço responsável.' : ''}</p>}{seconds === 0 && pending && <p className="error" role="status">O prazo da reserva terminou. Consulte o estado atualizado; o sistema liberará a vaga.</p>}
-          <aside className="participant-checkout__simulation"><Icon file="06f06" /><p>Pagamento simulado para demonstração acadêmica. Não há cobrança nem envio de dados bancários.</p></aside><fieldset className="participant-checkout__methods" disabled={busy || Boolean(requestedOutcome) || paymentPending}><legend>Formato da demonstração</legend>
+          <aside className="participant-checkout__simulation"><Icon file="06f06" /><p>Pagamento processado por um provedor externo simulado para demonstração acadêmica. Não há cobrança nem envio de dados bancários.</p></aside><fieldset className="participant-checkout__methods" disabled={busy || Boolean(requestedOutcome) || paymentPending}><legend>Formato da demonstração</legend>
             <label className={method === 'PIX' ? 'selected' : ''}><span><input type="radio" name="payment-method" aria-label="PIX" checked={method === 'PIX'} onChange={() => setMethod('PIX')} />PIX</span><p>Simulação de pagamento instantâneo.</p><div className="participant-checkout__method-demo"><strong>Demonstração PIX</strong><p>A aprovação ou a recusa será registrada ao simular o pagamento. Nenhum QR Code ou código de cobrança real é gerado.</p></div></label>
             <label className={method === 'CARD' ? 'selected' : ''}><span><input type="radio" name="payment-method" aria-label="Cartão de Crédito" checked={method === 'CARD'} onChange={() => setMethod('CARD')} />Cartão de Crédito</span><p>Simulação de pagamento por cartão.</p><div className="participant-checkout__method-demo participant-checkout__test-card"><small>CARTÃO DE DEMONSTRAÇÃO</small><strong>•••• •••• •••• 4242</strong><p>Dados fictícios. Nenhum número de cartão, validade ou CVV é solicitado.</p></div></label>
-          </fieldset><div className="participant-checkout__payment-result"><label htmlFor="payment-outcome">Resultado da simulação</label><select id="payment-outcome" value={requestedOutcome || outcome} disabled={busy || Boolean(requestedOutcome) || paymentPending} onChange={event => setOutcome(event.target.value as Outcome)}><option value="APPROVED">Aprovar pagamento</option><option value="DECLINED">Recusar pagamento</option></select></div><div className="participant-checkout__state-actions"><button className="text-button" disabled={busy} onClick={refresh}>Consultar estado</button>{pending && <button className="text-button" disabled={busy} onClick={cancel}>Cancelar inscrição</button>}</div></>}
+          </fieldset><div className="participant-checkout__payment-result"><label htmlFor="payment-outcome">Resultado da simulação</label><select id="payment-outcome" value={requestedOutcome || outcome} disabled={busy || Boolean(requestedOutcome) || paymentPending} onChange={event => setOutcome(event.target.value as Outcome)}><option value="APPROVED">Aprovar pagamento</option><option value="DECLINED">Recusar pagamento</option><option value="EXPIRED">Expirar pagamento</option></select></div><div className="participant-checkout__state-actions"><button className="text-button" disabled={busy} onClick={refresh}>Consultar estado</button>{pending && <button className="text-button" disabled={busy} onClick={cancel}>Cancelar inscrição</button>}</div></>}
         {step === 4 && registration && activity && <><h3 className="participant-checkout__result-title">{alreadyRegisteredId === registration.id && confirmed ? 'Você já está inscrito nesta atividade' : confirmed ? 'Inscrição confirmada com sucesso!' : registration.status === 'WAITLISTED' ? 'Você está na lista de espera' : registration.status === 'EXPIRED' ? 'Reserva expirada' : 'Inscrição cancelada'}</h3><p className={'status-badge status-' + registration.status} role="status">{statusLabel[registration.status]}</p>
           <div className={'participant-checkout__result' + (confirmed ? ' confirmed' : '')}><strong>{confirmed ? `Sua vaga está garantida, ${session?.user.name}!` : registration.status === 'WAITLISTED' ? 'A inscrição aguarda a liberação de uma vaga.' : 'Esta inscrição não possui uma vaga confirmada.'}</strong><p>{confirmed ? 'Consulte os dados e guarde o comprovante da sua participação.' : registration.status === 'WAITLISTED' ? 'A promoção ocorre por ordem de entrada. Se a atividade for paga, uma nova reserva iniciará o prazo para pagamento.' : payment?.status === 'DECLINED' ? 'O pagamento foi recusado e a vaga foi liberada.' : registration.status === 'EXPIRED' ? 'O prazo terminou e a vaga foi liberada. Uma aprovação tardia não confirma esta inscrição.' : 'A vaga foi liberada. Consulte o catálogo para iniciar uma nova inscrição.'}</p></div>
-          <article className="participant-checkout__receipt" aria-label={confirmed ? 'Comprovante de inscrição' : 'Dados da inscrição'}><p className="participant-checkout__eyebrow">{confirmed ? 'INSCRIÇÃO CONFIRMADA' : 'INSCRIÇÃO NO EVENTO'}</p><h3>{registration.eventTitle}</h3><div className="participant-checkout__selection"><p><strong>Atividade:</strong><br />{activity.title}</p></div><dl><div><dt>Participante</dt><dd>{session?.user.name}</dd></div><div><dt>Valor</dt><dd>{registration.priceCents ? money(registration.priceCents) : 'Gratuito'}</dd></div><div className="wide"><dt>Data e local da atividade</dt><dd>{date(activity.startsAt)} até {date(activity.endsAt)}<br />{activity.location}</dd></div><div className="wide"><dt>Identificador da inscrição</dt><dd>{registration.id}</dd></div></dl>{payment && <p className="participant-checkout__note">Pagamento: {statusLabel[payment.status]}</p>}{confirmed && <div className="participant-checkout__receipt-actions"><button className="secondary-button" onClick={copyReceipt}>Copiar comprovante</button><Link to={'/inscricoes/' + registration.id}>Link do comprovante</Link></div>}{copied && <p className="success" role="status">Comprovante copiado.</p>}</article>
+          <article className="participant-checkout__receipt" aria-label={confirmed ? 'Comprovante de inscrição' : 'Dados da inscrição'}><p className="participant-checkout__eyebrow">{confirmed ? 'INSCRIÇÃO CONFIRMADA' : 'INSCRIÇÃO NO EVENTO'}</p><h3>{registration.eventTitle}</h3><div className="participant-checkout__selection"><p><strong>Atividade:</strong><br />{activity.title}</p></div><dl><div><dt>Participante</dt><dd>{session?.user.name}</dd></div><div><dt>Valor</dt><dd>{registration.priceCents ? money(registration.priceCents) : 'Gratuito'}</dd></div><div className="wide"><dt>Data e local da atividade</dt><dd>{date(activity.startsAt)} até {date(activity.endsAt)}<br />{activity.location}</dd></div><div className="wide"><dt>Identificador da inscrição</dt><dd>{registration.id}</dd></div></dl>{payment && <p className="participant-checkout__note">Pagamento: {statusLabel[payment.status]}</p>}{confirmed && <CheckInCode value={registration.checkInCredential} />}{confirmed && <div className="participant-checkout__receipt-actions"><button className="secondary-button" onClick={copyReceipt}>Copiar comprovante</button><Link to={'/inscricoes/' + registration.id}>Link do comprovante</Link></div>}{copied && <p className="success" role="status">Comprovante copiado.</p>}</article>
           <div className="participant-checkout__state-actions"><button className="text-button" disabled={busy} onClick={refresh}>Consultar estado</button>{['CONFIRMED', 'WAITLISTED'].includes(registration.status) && <button className="text-button" disabled={busy} onClick={cancel}>Cancelar inscrição</button>}{['CANCELLED', 'EXPIRED'].includes(registration.status) && <Link to={'/eventos/' + registration.eventId + '/inscricao'}>Nova inscrição</Link>}</div></>}
       </div>{footer}
     </section>

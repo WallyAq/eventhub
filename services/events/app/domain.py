@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import secrets
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -33,6 +34,24 @@ def actor(authorization):
 def organization(id, authorization):
     return remote(os.environ["IDENTITY_URL"] + "/organizations/" + str(UUID(str(id))), authorization)["organization"]
 
+class PriceOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    lotName: str = Field(min_length=2, max_length=80)
+    category: str = Field(min_length=2, max_length=80)
+    priceCents: int = Field(strict=True, ge=0, le=10000000)
+    startsAt: datetime
+    endsAt: datetime
+
+    @model_validator(mode="after")
+    def window(self):
+        if not self.lotName.strip() or not self.category.strip():
+            raise ValueError("Preencha lote e categoria.")
+        if not self.startsAt.tzinfo or not self.endsAt.tzinfo or self.endsAt <= self.startsAt:
+            raise ValueError("Informe um período de venda válido com fuso horário.")
+        return self
+
+
 class ActivityInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=2, max_length=160)
@@ -46,6 +65,7 @@ class ActivityInput(BaseModel):
     description: str = Field(default="", max_length=5000)
     waitlistEnabled: bool = Field(default=True, strict=True)
     speakerId: UUID | None = None
+    priceOptions: list[PriceOption] = Field(default_factory=list, max_length=20)
 
     @field_validator("description")
     @classmethod
@@ -93,6 +113,7 @@ class EventInput(BaseModel):
     featured: bool = False
     speakers: list[Speaker] = Field(default_factory=list, max_length=30)
     activities: list[ActivityInput] = Field(min_length=1, max_length=50)
+    autoSpeakerCertificates: bool = Field(default=False, strict=True)
 
     @model_validator(mode="after")
     def dates(self):
@@ -111,6 +132,14 @@ class EventInput(BaseModel):
                     raise ValueError("Identificadores de palestrantes não podem se repetir.")
                 speakers[speaker.id] = speaker
         for item in self.activities:
+            if len({rate.id for rate in item.priceOptions}) != len(item.priceOptions):
+                raise ValueError("Identificadores de preços não podem se repetir.")
+            if item.priceOptions:
+                item.priceCents = min(rate.priceCents for rate in item.priceOptions)
+            if any(rate.endsAt > self.startsAt for rate in item.priceOptions):
+                raise ValueError("A venda dos lotes deve terminar até o início do evento.")
+            if self.autoSpeakerCertificates and item.speakerId is None:
+                raise ValueError("Vincule um palestrante a cada atividade para emissão automática.")
             if not item.startsAt.tzinfo or not item.endsAt.tzinfo or not (self.startsAt <= item.startsAt < item.endsAt <= self.endsAt):
                 raise ValueError("Atividades devem ocorrer dentro do período do evento.")
             if item.speakerId is not None:
@@ -131,7 +160,20 @@ def get_event(id):
     return row["payload"]
 
 def internal(request):
-    return bool(os.environ.get("INTERNAL_API_KEY")) and request.headers.get("x-internal-key") == os.environ["INTERNAL_API_KEY"]
+    key = os.environ.get("INTERNAL_API_KEY", "")
+    return bool(key) and secrets.compare_digest(request.headers.get("x-internal-key", ""), key)
+
+
+@router.get("/internal/certificate-events")
+def certificate_events(request: Request, offset: int = 0):
+    if not internal(request):
+        raise HTTPException(401, "Credencial interna inválida.")
+    if offset < 0 or offset > 1000000:
+        raise HTTPException(422, "Página inválida.")
+    with db() as conn:
+        rows = conn.execute("""SELECT payload FROM events WHERE status='PUBLISHED'
+            AND payload->>'autoSpeakerCertificates'='true' ORDER BY id LIMIT 50 OFFSET %s""", (offset,)).fetchall()
+    return {"events": [row["payload"] for row in rows], "offset": offset}
 
 
 def public_event(event):
@@ -191,9 +233,13 @@ def transition(id: UUID, action: Literal["publish", "cancel"], authorization: st
         if not row: raise HTTPException(404, "Evento não encontrado.")
         event = row["payload"]
         organization(event["organizationId"], authorization)
+        was_published = event["status"] == "PUBLISHED"
         if action == "publish":
             if event["status"] == "CANCELLED": raise HTTPException(409, "Evento cancelado não pode ser publicado.")
             if datetime.fromisoformat(event["startsAt"].replace("Z","+00:00")) <= datetime.now(timezone.utc): raise HTTPException(400, "Publique antes do início do evento.")
         event["status"] = "PUBLISHED" if action == "publish" else "CANCELLED"
         conn.execute("UPDATE events SET status=%s,payload=%s::jsonb WHERE id=%s", (event["status"],json.dumps(event),id))
+        if action == "cancel" and was_published:
+            from .announcements import enqueue
+            enqueue(conn, event, "event.cancelled", ["status"])
     return {"event": event}

@@ -38,6 +38,23 @@ def event_input():
 
 
 class OrganizerValidationTests(unittest.TestCase):
+    def test_price_options_and_speaker_emission_contract(self):
+        payload = event_input()
+        speaker_id, rate_id = str(uuid4()), str(uuid4())
+        payload['speakers'][0]['id'] = speaker_id
+        payload['activities'][0]['speakerId'] = speaker_id
+        payload['autoSpeakerCertificates'] = True
+        rate = {'id': rate_id, 'lotName': 'Lote inicial', 'category': 'Graduação', 'priceCents': 2500,
+                'startsAt': payload['startsAt'] - timedelta(days=1), 'endsAt': payload['startsAt']}
+        payload['activities'][0]['priceOptions'] = [rate]
+        value = domain.EventInput.model_validate(payload)
+        self.assertEqual(value.activities[0].priceCents, 2500)
+        self.assertTrue(value.autoSpeakerCertificates)
+        for options, linked in (([rate, rate], True), ([{**rate, 'endsAt': payload['endsAt']}], True), ([rate], False)):
+            bad = {**payload, 'activities': [{**payload['activities'][0], 'priceOptions': options,
+                                             'speakerId': speaker_id if linked else None}]}
+            with self.assertRaises(ValidationError): domain.EventInput.model_validate(bad)
+
     def test_legacy_payload_remains_accepted_with_defaults(self):
         value = domain.EventInput.model_validate(event_input())
         activity = value.activities[0]

@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import time
+import threading
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -9,16 +10,28 @@ import psycopg
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from .domain import db, migrate, router
+from . import templates, speakers
 
 
 @asynccontextmanager
 async def lifespan(app):
     migrate()
-    yield
+    templates.migrate()
+    speakers.migrate()
+    stop = threading.Event()
+    thread = threading.Thread(target=speakers.worker, args=(stop,), daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=6)
 
 
 app = FastAPI(title="EventHub certificates", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
+app.include_router(templates.router)
+app.include_router(speakers.router)
 
 
 @app.middleware("http")
@@ -28,6 +41,7 @@ async def request_logging(request, call_next):
     start = time.monotonic()
     response = await call_next(request)
     response.headers["x-request-id"] = request_id
+    response.headers["Cache-Control"] = "no-store"
     # Verification tokens are bearer-like public secrets; never include them in logs.
     path = "/certificates/verify/[code]" if request.url.path.startswith("/certificates/verify/") else request.url.path
     logging.getLogger("uvicorn.error").info(json.dumps({"service": "certificates", "requestId": request_id,

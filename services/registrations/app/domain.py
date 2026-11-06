@@ -7,6 +7,9 @@ import urllib.error
 import csv
 import io
 import secrets
+import hashlib
+import hmac
+import re
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from typing import Literal
@@ -15,7 +18,7 @@ import psycopg
 from psycopg.rows import dict_row
 from fastapi import APIRouter, Header, HTTPException, Request, Query
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 router = APIRouter()
 
@@ -49,14 +52,44 @@ def migrate():
         CREATE TABLE IF NOT EXISTS outbox(id uuid PRIMARY KEY, payload jsonb NOT NULL, published_at timestamptz);
         CREATE TABLE IF NOT EXISTS registration_actions(id uuid PRIMARY KEY,registration_id uuid NOT NULL REFERENCES registrations(id),
           actor_id uuid NOT NULL,action text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+        CREATE TABLE IF NOT EXISTS payment_notification_receipts(registration_id uuid PRIMARY KEY REFERENCES registrations(id),result text NOT NULL);
+        CREATE TABLE IF NOT EXISTS event_announcement_receipts(id uuid PRIMARY KEY,event_id uuid NOT NULL);
         """)
 
-def event_message(conn, row, kind):
+def event_message(conn, row, kind, details=None):
     message = {"id":str(uuid4()), "type":kind, "version":1, "registrationId":str(row["id"]),"userId":str(row["user_id"])}
+    if details:
+        message.update(details)
     conn.execute("INSERT INTO outbox(id,payload) VALUES(%s,%s::jsonb)", (message["id"],json.dumps(message)))
 
 def serialize(row):
-    return {"id":str(row["id"]),"activityId":str(row["activity_id"]),"userId":str(row["user_id"]),"status":row["status"],"priceCents":row["price_cents"],"expiresAt":row["expires_at"],"createdAt":row["created_at"],**row["snapshot"]}
+    result = {"id":str(row["id"]),"activityId":str(row["activity_id"]),"userId":str(row["user_id"]),"status":row["status"],"priceCents":row["price_cents"],"expiresAt":row["expires_at"],"createdAt":row["created_at"],**row["snapshot"]}
+    if os.environ.get("INTERNAL_API_KEY"):
+        result["checkInCredential"] = credential(row)
+    return result
+
+
+def credential(row):
+    message = "eventhub:check-in:v1:" + str(row["id"])
+    bound = message + ":" + str(row["user_id"]) + ":" + str(row["activity_id"])
+    signature = hmac.new(os.environ["INTERNAL_API_KEY"].encode(), bound.encode(), hashlib.sha256).hexdigest()
+    return message + ":" + signature
+
+
+def selected_price(activity, option_id, now=None):
+    rates = activity.get("priceOptions", [])
+    if not rates:
+        if option_id is not None:
+            raise HTTPException(409, "Este preço não pertence à atividade.")
+        return activity["priceCents"], None
+    rate = next((rate for rate in rates if rate["id"] == str(option_id)), None)
+    if not rate:
+        raise HTTPException(409, "Selecione um lote e categoria válidos.")
+    now = now or datetime.now(timezone.utc)
+    start, end = [datetime.fromisoformat(rate[key].replace("Z", "+00:00")) for key in ("startsAt", "endsAt")]
+    if not start <= now < end:
+        raise HTTPException(409, "Este lote não está disponível neste momento. Atualize a seleção.")
+    return rate["priceCents"], rate
 
 def lock(conn, activity):
     return conn.execute("SELECT * FROM inventories WHERE activity_id=%s FOR UPDATE", (activity,)).fetchone()
@@ -66,7 +99,7 @@ def maintain(conn, inventory, event=None):
     expired = conn.execute("UPDATE registrations SET status='EXPIRED' WHERE activity_id=%s AND status='PENDING_PAYMENT' AND expires_at<=clock_timestamp() RETURNING *", (inventory["activity_id"],)).fetchall()
     for row in expired: event_message(conn,row,"registration.expired")
     if event and event["status"] == "CANCELLED":
-        rows = conn.execute("UPDATE registrations SET status='CANCELLED' WHERE activity_id=%s AND status IN ('PENDING_PAYMENT','CONFIRMED','WAITLISTED') RETURNING *", (inventory["activity_id"],)).fetchall()
+        rows = conn.execute("UPDATE registrations SET status='CANCELLED',snapshot=snapshot || '{\"cancellationReason\":\"EVENT_CANCELLED\"}'::jsonb WHERE activity_id=%s AND status IN ('PENDING_PAYMENT','CONFIRMED','WAITLISTED') RETURNING *", (inventory["activity_id"],)).fetchall()
         for row in rows: event_message(conn,row,"registration.cancelled")
         return
     if not event or datetime.fromisoformat(event["startsAt"].replace("Z","+00:00")) <= datetime.now(timezone.utc): return
@@ -114,6 +147,7 @@ class Reservation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     eventId: UUID
     activityId: UUID
+    priceOptionId: UUID | None = None
 
 @router.post("/registrations", status_code=201)
 def reserve(value: Reservation, authorization: str = Header(default=""), idempotency_key: str = Header(default="")):
@@ -129,20 +163,25 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
         previous = conn.execute("SELECT * FROM registrations WHERE user_id=%s AND request_key=%s", (user["id"],idempotency_key)).fetchone()
         if previous:
             if str(previous["activity_id"]) != str(value.activityId): raise HTTPException(409,"Chave já utilizada para outra atividade.")
+            if previous["snapshot"].get("priceOption", {}).get("id") != (str(value.priceOptionId) if value.priceOptionId else None):
+                raise HTTPException(409, "Chave já utilizada para outro lote/categoria.")
             return {"registration":serialize(previous)}
         conn.execute("INSERT INTO inventories(activity_id,event_id,capacity) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",(value.activityId,value.eventId,activity["capacity"]))
         inventory = lock(conn,value.activityId)
+        price, rate = selected_price(activity, value.priceOptionId)
         maintain(conn,inventory,event)
         existing = conn.execute("SELECT * FROM registrations WHERE activity_id=%s AND user_id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT','WAITLISTED')",(value.activityId,user["id"])).fetchone()
         if existing: raise HTTPException(409,"Você já está inscrito nesta atividade.")
         count = conn.execute("SELECT count(*) AS n FROM registrations WHERE activity_id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT')",(value.activityId,)).fetchone()["n"]
         if count >= inventory["capacity"] and activity.get("waitlistEnabled", True) is False:
             raise HTTPException(409,"Atividade lotada e sem lista de espera.")
-        status = "WAITLISTED" if count >= inventory["capacity"] else "PENDING_PAYMENT" if activity["priceCents"] else "CONFIRMED"
+        status = "WAITLISTED" if count >= inventory["capacity"] else "PENDING_PAYMENT" if price else "CONFIRMED"
         snapshot = {"eventId":event["id"],"eventTitle":event["title"],"activity":activity}
+        if rate:
+            snapshot["priceOption"] = rate
         row = conn.execute("""INSERT INTO registrations(id,activity_id,user_id,request_key,status,price_cents,expires_at,snapshot)
           VALUES(%s,%s,%s,%s,%s,%s,CASE WHEN %s='PENDING_PAYMENT' THEN clock_timestamp()+(%s * interval '1 second') END,%s::jsonb) RETURNING *""",
-          (str(uuid4()),value.activityId,user["id"],idempotency_key,status,activity["priceCents"],status,int(os.environ.get("RESERVATION_TTL_SECONDS","900")),json.dumps(snapshot))).fetchone()
+          (str(uuid4()),value.activityId,user["id"],idempotency_key,status,price,status,int(os.environ.get("RESERVATION_TTL_SECONDS","900")),json.dumps(snapshot))).fetchone()
         event_message(conn,row,"registration.confirmed" if status == "CONFIRMED" else "registration.reserved" if status == "PENDING_PAYMENT" else "registration.waitlisted")
     return {"registration":serialize(row)}
 
@@ -187,6 +226,34 @@ def internal_detail(id:UUID,request:Request):
         row=conn.execute("SELECT * FROM registrations WHERE id=%s",(id,)).fetchone()
         if not row: raise HTTPException(404,"Inscrição não encontrada.")
         return {"registration":serialize(row)}
+
+
+class ResolveCredential(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    credential: str = Field(min_length=100, max_length=200)
+    eventId: UUID
+    activityId: UUID | None = None
+
+
+@router.post("/internal/registrations/resolve-credential")
+def resolve_credential(value: ResolveCredential, request: Request):
+    secured(request)
+    if not re.fullmatch(r"eventhub:check-in:v1:[a-f0-9-]{36}:[a-f0-9]{64}", value.credential):
+        raise HTTPException(400, "QR Code de credencial inválido.")
+    parts = value.credential.split(":")
+    try:
+        if len(parts) != 5 or parts[:3] != ["eventhub", "check-in", "v1"]:
+            raise ValueError()
+        registration_id = UUID(parts[3])
+    except ValueError:
+        raise HTTPException(400, "QR Code de credencial inválido.")
+    with db() as conn:
+        row = conn.execute("SELECT * FROM registrations WHERE id=%s", (registration_id,)).fetchone()
+    if not row or not hmac.compare_digest(credential(row), value.credential):
+        raise HTTPException(404, "Credencial não encontrada.")
+    if row["snapshot"]["eventId"] != str(value.eventId) or (value.activityId and str(row["activity_id"]) != str(value.activityId)):
+        raise HTTPException(409, "A credencial pertence a outro evento ou atividade.")
+    return {"registration": serialize(row)}
 
 
 RegistrationStatus = Literal["PENDING_PAYMENT", "CONFIRMED", "CANCELLED", "EXPIRED", "WAITLISTED"]
@@ -317,6 +384,7 @@ def payment(id:UUID,value:Decision,request:Request):
     with db() as conn:
         row=conn.execute("SELECT * FROM registrations WHERE id=%s",(id,)).fetchone()
         if not row: raise HTTPException(404,"Inscrição não encontrada.")
+        if row["price_cents"] <= 0: raise HTTPException(409,"Inscrição gratuita não possui pagamento.")
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         inventory=lock(conn,row["activity_id"])
         maintain(conn,inventory,event)
@@ -325,9 +393,70 @@ def payment(id:UUID,value:Decision,request:Request):
             status="CONFIRMED" if value.outcome == "APPROVED" else "EXPIRED" if value.outcome == "EXPIRED" else "CANCELLED"
             row=conn.execute("UPDATE registrations SET status=CASE WHEN expires_at<=clock_timestamp() THEN 'EXPIRED' ELSE %s END WHERE id=%s RETURNING *",(status,id)).fetchone()
             status=row["status"]
-            event_message(conn,row,"registration.confirmed" if status == "CONFIRMED" else "registration.cancelled")
+            event_message(conn,row,{"CONFIRMED": "registration.confirmed", "EXPIRED": "registration.expired", "CANCELLED": "registration.cancelled"}[status])
             maintain(conn,inventory,event)
+        if row["status"] not in ("CONFIRMED", "CANCELLED", "EXPIRED"):
+            raise HTTPException(409, "Inscrição indisponível para confirmação de pagamento.")
+        result = "APPROVED" if row["status"] == "CONFIRMED" else "EXPIRED" if row["status"] == "EXPIRED" or value.outcome != "DECLINED" else "DECLINED"
+        receipt = conn.execute("INSERT INTO payment_notification_receipts(registration_id,result) VALUES(%s,%s) ON CONFLICT DO NOTHING RETURNING registration_id", (id, result)).fetchone()
+        if receipt:
+            event_message(conn, row, "payment." + result.lower(), {"amountCents": row["price_cents"], "providerStatus": value.outcome,
+                "registrationStatus": row["status"], "occurredAt": datetime.now(timezone.utc).isoformat()})
         return {"registration":serialize(row)}
+
+
+class AnnouncementInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=2, max_length=160)
+    description: str = Field(max_length=5000)
+    location: str = Field(max_length=240)
+    streamUrl: str = Field(max_length=500)
+    sessionTime: str = Field(max_length=120)
+
+
+class Announcement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    eventId: UUID
+    type: Literal["event.updated", "event.cancelled"]
+    occurredAt: datetime
+    event: AnnouncementInfo
+    changedFields: list[Literal["title", "description", "location", "streamUrl", "sessionTime", "status"]] = Field(min_length=1, max_length=6)
+
+    @field_validator("occurredAt")
+    @classmethod
+    def aware(cls, value):
+        if not value.tzinfo:
+            raise ValueError("Informe fuso horário.")
+        return value
+
+
+@router.post("/internal/events/{id}/announcements")
+def announcement(id: UUID, value: Announcement, request: Request):
+    secured(request)
+    if id != value.eventId:
+        raise HTTPException(409, "Evento da comunicação divergente.")
+    event = remote("EVENTS", "/events/" + str(id))["event"]
+    if event["status"] == "DRAFT" or (value.type == "event.cancelled" and event["status"] != "CANCELLED"):
+        raise HTTPException(409, "Comunicação incompatível com o evento.")
+    with db() as conn:
+        claimed = conn.execute("INSERT INTO event_announcement_receipts(id,event_id) VALUES(%s,%s) ON CONFLICT DO NOTHING RETURNING id", (value.id, id)).fetchone()
+        if not claimed:
+            return {"accepted": True, "duplicate": True, "queued": 0}
+        # One announcement per person, even when enrolled in several activities.
+        # Active registrations and those cancelled by the event remain eligible during convergence.
+        result = conn.execute("""WITH recipients AS (
+            SELECT DISTINCT ON (r.user_id) r.id,r.user_id FROM registrations r
+            JOIN inventories i ON i.activity_id=r.activity_id WHERE i.event_id=%s AND r.created_at<=%s
+            AND (r.status IN ('CONFIRMED','PENDING_PAYMENT','WAITLISTED') OR
+                 (r.status='CANCELLED' AND r.snapshot->>'cancellationReason'='EVENT_CANCELLED'))
+            ORDER BY r.user_id,r.created_at,r.id
+        ), messages AS (SELECT gen_random_uuid() AS mid,id,user_id FROM recipients)
+        INSERT INTO outbox(id,payload) SELECT mid,%s::jsonb || jsonb_build_object(
+            'id',mid::text,'announcementId',%s::text,'registrationId',id::text,'userId',user_id::text,'version',1) FROM messages""",
+            (id, value.occurredAt, json.dumps({"type": value.type, "eventId": str(id), "occurredAt": value.occurredAt.isoformat(),
+                "event": value.event.model_dump(), "changedFields": value.changedFields}), str(value.id)))
+        return {"accepted": True, "duplicate": False, "queued": result.rowcount}
 
 def worker(stop):
     while not stop.wait(3):
@@ -343,7 +472,8 @@ def worker(stop):
             connection=pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq",credentials=credentials,connection_attempts=1,socket_timeout=3,blocked_connection_timeout=3))
             channel=connection.channel(); channel.exchange_declare(exchange="eventhub",exchange_type="topic",durable=True)
             channel.queue_declare(queue="notifications",durable=True)
-            channel.queue_bind(queue="notifications",exchange="eventhub",routing_key="registration.#")
+            for kind in ("registration.#", "payment.#", "event.#"):
+                channel.queue_bind(queue="notifications",exchange="eventhub",routing_key=kind)
             channel.confirm_delivery()
             with db() as conn:
                 rows=conn.execute("SELECT * FROM outbox WHERE published_at IS NULL LIMIT 100 FOR UPDATE SKIP LOCKED").fetchall()

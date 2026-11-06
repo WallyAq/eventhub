@@ -1,3 +1,4 @@
+import { RequiredMark } from '../../components/form/RequiredMark';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -66,9 +67,9 @@ export function OrganizationProfilePage() {
         </div>
         {editing && owner ? <form onSubmit={submit}><fieldset disabled={busy}>
           <div className="organization-profile__fields">
-            <div className="form-field organization-profile__full"><label htmlFor="institution-legal-name">Nome/Razão Social</label><input id="institution-legal-name" required minLength={2} maxLength={120} value={legalName} onChange={e => setLegalName(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="institution-cnpj">CNPJ</label><input id="institution-cnpj" required={!!organization.cnpj} maxLength={18} placeholder="12.345.678/0001-90" value={cnpj} onChange={e => setCnpj(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="institution-name">Nome Fantasia ou Sigla</label><input id="institution-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
+            <div className="form-field organization-profile__full"><label htmlFor="institution-legal-name">Nome/Razão Social<RequiredMark /></label><input id="institution-legal-name" required minLength={2} maxLength={120} value={legalName} onChange={e => setLegalName(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="institution-cnpj">CNPJ<RequiredMark required={!!organization.cnpj} /></label><input id="institution-cnpj" required={!!organization.cnpj} maxLength={18} placeholder="12.345.678/0001-90" value={cnpj} onChange={e => setCnpj(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="institution-name">Nome Fantasia ou Sigla<RequiredMark /></label><input id="institution-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
             <div className="form-field"><label htmlFor="institution-phone">Telefone</label><input id="institution-phone" type="tel" maxLength={30} placeholder="(85) 91234-5678" value={phone} onChange={e => setPhone(e.target.value)} /></div>
             <div className="form-field organization-profile__full"><label htmlFor="institution-email">E-mail</label><input id="institution-email" type="email" maxLength={254} aria-describedby="institution-email-help" value={email} onChange={e => setEmail(e.target.value)} /><small id="institution-email-help">Utilizado para comunicações institucionais. Sua conta pessoal de acesso é mantida.</small></div>
           </div>

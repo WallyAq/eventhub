@@ -1,3 +1,4 @@
+import { RequiredMark } from '../components/form/RequiredMark';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -95,7 +96,7 @@ export function ProfilePage() {
         <header className="participant-profile__section-header"><h2 id="participant-account-heading" className="section-heading"><img src="/figma/98116.svg" alt="" />{editing ? 'Dados Pessoais' : 'Dados da Conta'}</h2></header>
         {editing ? <form onSubmit={submit} aria-busy={busy}><fieldset disabled={busy}>
           <div className="participant-profile__fields">
-            <div className="form-field"><label htmlFor="profile-name">Nome completo</label><input id="profile-name" autoFocus autoComplete="name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="profile-name">Nome completo<RequiredMark /></label><input id="profile-name" autoFocus autoComplete="name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
             <div className="form-field"><label htmlFor="profile-cpf">CPF</label><input id="profile-cpf" inputMode="numeric" maxLength={14} placeholder="123.456.789-10" value={cpf} onChange={e => setCpf(e.target.value)} /></div>
             <div className="form-field"><label htmlFor="profile-phone">Telefone</label><input id="profile-phone" type="tel" autoComplete="tel" maxLength={30} placeholder="(85) 91234-5678" value={phone} onChange={e => setPhone(e.target.value)} /></div>
             <div className="form-field"><label htmlFor="profile-email">E-mail</label><input id="profile-email" type="email" autoComplete="email" aria-describedby="profile-email-help" value={profile.email} readOnly /><small id="profile-email-help">Utilizado para comunicações institucionais e login de acesso. A alteração de e-mail ainda não está disponível.</small></div>

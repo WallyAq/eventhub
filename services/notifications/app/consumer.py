@@ -44,7 +44,8 @@ def consume(stop, delivery):
             connection=pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq",credentials=credentials,socket_timeout=3,blocked_connection_timeout=3))
             channel=connection.channel(); channel.exchange_declare(exchange="eventhub",exchange_type="topic",durable=True)
             channel.queue_declare(queue="notifications",durable=True)
-            channel.queue_bind(queue="notifications",exchange="eventhub",routing_key="registration.#")
+            for kind in ("registration.#", "payment.#", "event.#"):
+                channel.queue_bind(queue="notifications",exchange="eventhub",routing_key=kind)
             channel.queue_declare(queue="notifications.failed",durable=True)
             channel.basic_qos(prefetch_count=1)
             channel.confirm_delivery()

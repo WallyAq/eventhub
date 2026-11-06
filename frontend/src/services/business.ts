@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { identityRequest, errorMessage } from './identity';
 
-export type Activity={id:string;title:string;startsAt:string;endsAt:string;location:string;responsible:string;capacity:number;priceCents:number;kind?:'Curso'|'Minicurso'|'Workshop'|'Palestra';description?:string;waitlistEnabled?:boolean;speakerId?:string|null};
+export type PriceOption={id:string;lotName:string;category:string;priceCents:number;startsAt:string;endsAt:string};
+export type Activity={id:string;title:string;startsAt:string;endsAt:string;location:string;responsible:string;capacity:number;priceCents:number;kind?:'Curso'|'Minicurso'|'Workshop'|'Palestra';description?:string;waitlistEnabled?:boolean;speakerId?:string|null;priceOptions?:PriceOption[]};
 export type Speaker={id?:string;name:string;institution:string;degree?:string;email?:string;biography?:string};
-export type EventData={id:string;organizationId:string;organizationName:string;title:string;description:string;category:string;hours:number;modality:string;location:string;streamUrl:string;startsAt:string;endsAt:string;sessionTime:string;featured:boolean;speakers:Speaker[];activities:Activity[];status:'DRAFT'|'PUBLISHED'|'CANCELLED'};
-export type Registration={id:string;userId:string;activityId:string;eventId:string;eventTitle:string;activity:Activity;priceCents:number;status:'PENDING_PAYMENT'|'CONFIRMED'|'CANCELLED'|'EXPIRED'|'WAITLISTED';expiresAt:string|null;createdAt:string};
+export type EventData={id:string;organizationId:string;organizationName:string;title:string;description:string;category:string;hours:number;modality:string;location:string;streamUrl:string;startsAt:string;endsAt:string;sessionTime:string;featured:boolean;speakers:Speaker[];activities:Activity[];status:'DRAFT'|'PUBLISHED'|'CANCELLED';autoSpeakerCertificates?:boolean};
+export type Registration={id:string;userId:string;activityId:string;eventId:string;eventTitle:string;activity:Activity;priceCents:number;status:'PENDING_PAYMENT'|'CONFIRMED'|'CANCELLED'|'EXPIRED'|'WAITLISTED';expiresAt:string|null;createdAt:string;checkInCredential?:string;priceOption?:PriceOption};
 export type Payment={registrationId:string;amountCents:number;status:'PENDING'|'APPROVED'|'DECLINED'|'EXPIRED'};
 export async function api<T>(path:string,token?:string,method='GET',body?:unknown):Promise<T>{return await identityRequest(path,method,body,token) as unknown as T;}
-export async function reserve(token:string,eventId:string,activityId:string,key:string):Promise<Registration>{
-  const response=await fetch('/api/registrations',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({eventId,activityId}),signal:AbortSignal.timeout(20000)});
+export async function reserve(token:string,eventId:string,activityId:string,key:string,priceOptionId?:string):Promise<Registration>{
+  const response=await fetch('/api/registrations',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({eventId,activityId,...(priceOptionId?{priceOptionId}:{})}),signal:AbortSignal.timeout(20000)});
   const data=await response.json(); if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:data.message || 'Não foi possível reservar. Tente novamente.');return data.registration;
 }
 export function useData<T>(path:string){

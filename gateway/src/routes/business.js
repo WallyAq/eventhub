@@ -35,6 +35,7 @@ export function createBusinessRouter(services, verify, request = fetch) {
   router.get('/events/:id', forward);
   router.post('/events', forward);
   router.put('/events/:id', forward);
+  router.patch('/events/:id/public-information', forward);
   router.post('/events/:id/publish', forward);
   router.post('/events/:id/cancel', forward);
   router.get('/registrations', forward);
@@ -47,6 +48,7 @@ export function createBusinessRouter(services, verify, request = fetch) {
   router.get('/organizer/events/:id/registrations/export.csv', (req, res) => proxy(req, res, { service: 'registrations', download: true }));
   router.post('/organizer/registrations/:id/cancel', (req, res) => proxy(req, res, { service: 'registrations' }));
   router.post('/attendance/check-ins', (req, res) => proxy(req, res, { service: 'attendance' }));
+  router.post('/attendance/credentials/resolve', (req, res) => proxy(req, res, { service: 'attendance' }));
   router.get('/attendance/registrations/:id', (req, res) => proxy(req, res, { service: 'attendance' }));
   router.get('/organizer/events/:id/attendance', (req, res) => proxy(req, res, { service: 'attendance' }));
   router.get('/certificates/verify/:code', (req, res) => proxy(req, res, { service: 'certificates', public: true }));
@@ -54,6 +56,12 @@ export function createBusinessRouter(services, verify, request = fetch) {
   router.get('/certificates', (req, res) => proxy(req, res, { service: 'certificates' }));
   router.get('/certificates/:id/download', (req, res) => proxy(req, res, { service: 'certificates', download: true }));
   router.get('/certificates/:id', (req, res) => proxy(req, res, { service: 'certificates' }));
+  router.get('/organizer/events/:id/certificate-settings', (req, res) => proxy(req, res, { service: 'certificates' }));
+  router.put('/organizer/events/:id/certificate-settings', (req, res) => proxy(req, res, { service: 'certificates' }));
+  router.get('/organizer/events/:id/certificate-preview', (req, res) => proxy(req, res, { service: 'certificates', download: true }));
+  router.get('/organizer/events/:id/speaker-certificates', (req, res) => proxy(req, res, { service: 'certificates' }));
+  router.post('/organizer/events/:id/speaker-certificates', (req, res) => proxy(req, res, { service: 'certificates' }));
+  router.get('/speaker-certificates/:id/download', (req, res) => proxy(req, res, { service: 'certificates', download: true }));
   router.get('/reports/events/:id', (req, res) => proxy(req, res, { service: 'reporting' }));
   router.get('/reports/events/:id/export.csv', (req, res) => proxy(req, res, { service: 'reporting', download: true }));
   return router;

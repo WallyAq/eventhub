@@ -100,6 +100,7 @@ services:
       PGDATABASE: event_db
       PGPASSWORD: ${EVENT_DB_PASSWORD:?Defina EVENT_DB_PASSWORD no .env}
       IDENTITY_URL: http://identity:3000
+      REGISTRATIONS_URL: http://registrations:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
     depends_on:
       postgres:
@@ -137,7 +138,24 @@ services:
       PGPASSWORD: ${PAYMENT_DB_PASSWORD:?Defina PAYMENT_DB_PASSWORD no .env}
       IDENTITY_URL: http://identity:3000
       REGISTRATIONS_URL: http://registrations:8000
+      PAYMENT_PROVIDER_URL: http://payment-provider:3000
+      PAYMENT_PROVIDER_API_KEY: ${PAYMENT_PROVIDER_API_KEY:?Execute node scripts/init-backend-config.mjs}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Execute node scripts/init-internal-key.mjs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payment-provider:
+    <<: *app
+    build: ./services/payment-provider
+    healthcheck: *node-health
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: provider_user
+      PGDATABASE: provider_db
+      PGPASSWORD: ${PROVIDER_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      PAYMENT_PROVIDER_API_KEY: ${PAYMENT_PROVIDER_API_KEY:?Execute node scripts/init-backend-config.mjs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -244,6 +262,7 @@ services:
       ATTENDANCE_DB_PASSWORD: ${ATTENDANCE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
       CERTIFICATE_DB_PASSWORD: ${CERTIFICATE_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
       REPORTING_DB_PASSWORD: ${REPORTING_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
+      PROVIDER_DB_PASSWORD: ${PROVIDER_DB_PASSWORD:?Execute node scripts/init-backend-config.mjs}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/db/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro

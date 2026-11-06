@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { QrCheckInDialog } from '../../components/events/QrCheckInDialog';
+import { CertificateSettings } from '../../components/events/CertificateSettings';
+import { PublicEventInformation } from '../../components/events/PublicEventInformation';
+import { RequiredMark } from '../../components/form/RequiredMark';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { BusinessLayout, Feedback } from '../../components/Business';
 import { OrganizerDialog } from '../../components/events/OrganizerDialog';
@@ -15,17 +19,20 @@ export function OrganizerEventPage() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const tab = params.get('aba') || 'inscricoes';
+  const [notice, setNotice] = useState('');
+  useEffect(() => { setNotice(''); }, [id]);
   const { data, loading, error, reload } = useData<{ event: EventData }>('/events/' + id + '?managed=true');
   return <BusinessLayout area="organization"><div className="organizer-event">
     <Link to="/organizacao/eventos">← Gerenciar eventos</Link>
     <Feedback loading={loading} error={error} />
+    {notice && <p className="success" role="status">{notice}</p>}
     {!loading && !error && data && <>
       <header className="business-heading"><div><h1>{data.event.title}</h1><p>{data.event.organizationName} · {data.event.modality} · {date(data.event.startsAt)}</p><span className={'status-badge status-' + data.event.status}>{statusLabel[data.event.status]}</span></div><div className="organizer-actions"><Link className="secondary-button" to={'/organizacao/eventos/' + id}>Editar dados do evento</Link>{data.event.status === 'PUBLISHED' && <Link className="primary-button" to={'/eventos/' + id}>Ver página do evento</Link>}</div></header>
       <nav className="organizer-tabs" aria-label="Gestão do evento">{tabs.map(([key, label]) => <button type="button" key={key} aria-current={tab === key ? 'page' : undefined} onClick={() => setParams({ aba: key })}>{label}</button>)}</nav>
       {tab === 'inscricoes' && <Registrations key={id} event={data.event} />}
       {tab === 'atividades' && <Activities event={data.event} />}
       {tab === 'palestrantes' && <Speakers event={data.event} />}
-      {tab === 'configuracoes' && <Settings event={data.event} reload={reload} />}
+      {tab === 'configuracoes' && <Settings event={data.event} reload={reload} onNotice={setNotice} />}
       {!tabs.some(([key]) => key === tab) && <p>Selecione uma das abas para gerenciar o evento.</p>}
     </>}
   </div></BusinessLayout>;
@@ -70,8 +77,8 @@ function PresenceDialog({ registration, busy, error, onClose, onConfirm }: { reg
 }
 
 function Activities({ event }: { event: EventData }) {
-  const [query, setQuery] = useState(''), [selected, setSelected] = useState('');
-  return <><section className="business-card organizer-panel"><div className="section-toolbar"><div><h2>Atividades e check-in</h2><p>Programação e controle de vagas por atividade.</p></div><Link className="secondary-button" to={'/organizacao/eventos/' + event.id}>Editar programação</Link></div><input aria-label="Buscar atividades" placeholder="Buscar atividade ou responsável" value={query} onChange={e => setQuery(e.target.value)} />{event.activities.filter(item => (item.title + item.responsible).toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(item => <article className="organizer-list-row" key={item.id}><div><h3>{item.title}</h3><p>{date(item.startsAt)} — {date(item.endsAt)}</p><p>{item.responsible} · {item.location}</p><small>{item.capacity} vagas · {money(item.priceCents)} · {item.kind || 'Atividade'}</small></div><button className="primary-button" onClick={() => setSelected(item.id)}>Lista de presença</button></article>)}</section>{selected && <Registrations key={selected} event={event} checkIn activityId={selected} />}</>;
+  const [query, setQuery] = useState(''), [selected, setSelected] = useState(''), [scanner, setScanner] = useState('');
+  return <><section className="business-card organizer-panel"><div className="section-toolbar"><div><h2>Atividades e check-in</h2><p>Programação e controle de vagas por atividade.</p></div><Link className="secondary-button" to={'/organizacao/eventos/' + event.id}>Editar programação</Link></div><input aria-label="Buscar atividades" placeholder="Buscar atividade ou responsável" value={query} onChange={e => setQuery(e.target.value)} />{event.activities.filter(item => (item.title + item.responsible).toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(item => <article className="organizer-list-row" key={item.id}><div><h3>{item.title}</h3><p>{date(item.startsAt)} — {date(item.endsAt)}</p><p>{item.responsible} · {item.location}</p><small>{item.capacity} vagas · {money(item.priceCents)} · {item.kind || 'Atividade'}</small></div><div className="organizer-actions"><button className="primary-button" onClick={() => setSelected(item.id)}>Lista de presença</button><button className="secondary-button" disabled={event.status !== 'PUBLISHED'} onClick={() => setScanner(item.id)}>Ler QR Code</button></div></article>)}</section>{selected && <Registrations key={selected} event={event} checkIn activityId={selected} />}{scanner && <QrCheckInDialog key={scanner} event={event} activityId={scanner} onClose={() => setScanner('')} />}</>;
 }
 
 function Speakers({ event }: { event: EventData }) {
@@ -80,7 +87,7 @@ function Speakers({ event }: { event: EventData }) {
   return <section className="business-card organizer-panel"><div className="section-toolbar"><div><h2>Professores e palestrantes</h2><p>Corpo docente e convidados do evento.</p></div><Link className="secondary-button" to={'/organizacao/eventos/' + event.id}>Editar palestrantes</Link></div><input aria-label="Buscar palestrantes" placeholder="Buscar nome ou instituição" value={query} onChange={e => setQuery(e.target.value)} />{items.map((item, index) => <article key={item.id || index} className="organizer-list-row"><span className="organizer-avatar" aria-hidden="true">{item.name.slice(0, 1)}</span><div><h3>{item.name}</h3><p>{item.degree} · {item.institution}</p><p>{item.email}</p><small>{item.biography}</small></div></article>)}{!items.length && <div className="empty-state">Nenhum palestrante encontrado.</div>}</section>;
 }
 
-function Settings({ event, reload }: { event: EventData; reload: () => void }) {
+function Settings({ event, reload, onNotice }: { event: EventData; reload: () => void; onNotice: (message: string) => void }) {
   const { session } = useAuth();
   const [confirm, setConfirm] = useState(false), [title, setTitle] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function cancel() {
@@ -90,8 +97,9 @@ function Settings({ event, reload }: { event: EventData; reload: () => void }) {
     catch (error) { setError(errorMessage(error)); } finally { setBusy(false); }
   }
   return <div className="organizer-settings"><section className="business-card"><h2>Inscrições e lotação</h2><div className="organizer-setting-grid"><div><small>Estado do evento</small><p>{statusLabel[event.status]}</p></div><div><small>Capacidade das atividades</small><p>{event.activities.reduce((sum, item) => sum + item.capacity, 0)} vagas</p></div><div><small>Atividades com lista de espera</small><p>{event.activities.filter(item => item.waitlistEnabled !== false).length}</p></div></div><p>As vagas, os valores e a programação são definidos no rascunho e ficam fixos após a publicação.</p><Link className="secondary-button" to={'/organizacao/eventos/' + event.id}>Revisar dados e publicação</Link></section>
-    <section className="business-card"><h2>Certificados e emissão digital</h2><p>O participante pode emitir seu certificado após o término da atividade, com inscrição confirmada e presença registrada.</p><div className="organizer-setting-grid"><article className="certificate-preview"><small>MODELO PADRÃO EVENTHUB</small><h3>CERTIFICADO DE CONCLUSÃO</h3><p>Nome do participante</p><strong>{event.title}</strong><p>{event.organizationName} · {event.hours}h</p><small>Autenticidade verificada por código único</small></article><div><h3>Emissão pelo participante</h3><p>O certificado fica disponível em Minhas Inscrições quando os requisitos forem atendidos.</p><p>O modelo e as regras são os padrões do EventHub. O serviço atual não oferece personalização de fundo, assinaturas ou envio de arquivos.</p></div></div></section>
+    <CertificateSettings key={event.id} event={event} />
+    <PublicEventInformation key={'public-' + event.id} event={event} reload={reload} onNotice={onNotice} />
     <section className="business-card organizer-danger"><h2>Ações críticas</h2><div className="section-toolbar"><div><h3>Cancelar evento</h3><p>O cancelamento impede novas inscrições e inicia o cancelamento das reservas.</p></div><button className="danger-button" disabled={event.status === 'CANCELLED'} onClick={() => { setError(''); setTitle(''); setConfirm(true); }}>Cancelar evento</button></div></section>
-    {confirm && <OrganizerDialog title="Cancelar evento?" description="Confira o impacto antes de continuar. Esta ação não pode ser desfeita." onClose={() => { if (!busy) setConfirm(false); }} onSubmit={cancel} footer={<><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirm(false)}>Voltar</button><button className="danger-button" disabled={busy || title !== event.title}>{busy ? 'Cancelando…' : 'Sim, cancelar evento'}</button></>}><div className="organizer-confirm"><p>As inscrições e os certificados dependem do estado do evento. Avise os participantes sobre o cancelamento.</p><label htmlFor="cancel-event-title">Para confirmar, digite: <strong>{event.title}</strong></label><input id="cancel-event-title" value={title} disabled={busy} onChange={e => setTitle(e.target.value)} required /><Feedback loading={false} error={error} /></div></OrganizerDialog>}
+    {confirm && <OrganizerDialog title="Cancelar evento?" description="Confira o impacto antes de continuar. Esta ação não pode ser desfeita." onClose={() => { if (!busy) setConfirm(false); }} onSubmit={cancel} footer={<><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirm(false)}>Voltar</button><button className="danger-button" disabled={busy || title !== event.title}>{busy ? 'Cancelando…' : 'Sim, cancelar evento'}</button></>}><div className="organizer-confirm"><p>O cancelamento impede novas inscrições e enfileira avisos aos participantes inscritos. A entrega dos avisos ocorre em segundo plano.</p><label htmlFor="cancel-event-title">Para confirmar, digite: <strong>{event.title}</strong><RequiredMark /></label><input id="cancel-event-title" value={title} disabled={busy} onChange={e => setTitle(e.target.value)} required /><Feedback loading={false} error={error} /></div></OrganizerDialog>}
   </div>;
 }

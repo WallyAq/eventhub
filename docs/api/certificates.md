@@ -1,4 +1,4 @@
-# Certificate — certificados de participação
+# Certificate — certificados e modelos da organização
 
 Serviço Python/FastAPI em `services/certificates`, banco próprio `certificate_db`. Acesso por `/api` no gateway. Não lê tabelas de Identity, Events, Registrations ou Attendance: todas as consultas entre domínios usam HTTP interno.
 
@@ -19,6 +19,11 @@ Erros de elegibilidade retornam `409` com código de motivo. Dependências indis
 | GET | `/certificates/:id` | Dados e validade atual, somente titular ou organização responsável |
 | GET | `/certificates/:id/download` | PDF real, privado, somente titular ou organização responsável e com validade atual |
 | GET | `/certificates/verify/:code` | Verificação pública por código aleatório de 64 caracteres hexadecimais |
+| GET, PUT | `/organizer/events/:id/certificate-settings` | Consulta/salva modelo do evento, mediante vínculo com a organização |
+| GET | `/organizer/events/:id/certificate-preview?kind=PARTICIPANT` | Prévia PDF do modelo salvo, sem emissão; aceita também `kind=SPEAKER` |
+| GET | `/organizer/events/:id/speaker-certificates` | Lista de certificados dos palestrantes do evento e validade atual |
+| POST | `/organizer/events/:id/speaker-certificates` | Verificação imediata e idempotente das emissões automáticas; `{issued}` |
+| GET | `/speaker-certificates/:id/download` | PDF do palestrante, somente organização responsável, com validade atual |
 | GET | `/health`, `/ready` | Liveness e disponibilidade do banco/tabela próprios |
 
 O registro contém UUID, inscrição única, snapshot do nome do participante e dos títulos/datas da atividade e evento, organização, carga horária, referência à presença, emissão UTC e SHA-256 canônico do snapshot. Não armazena CPF, telefone ou e-mail. Um bloqueio transacional por inscrição e a restrição única impedem certificados duplicados em chamadas concorrentes. Emissões repetidas preservam o snapshot e a data originais.
@@ -30,6 +35,22 @@ O PDF inclui o número, período, carga horária, data de emissão, hash, link e
 Como os serviços têm transações independentes, uma alteração pode ocorrer entre a consulta remota e a resposta. A emissão reconsulta as condições após obter o bloqueio local; download e validação consultam novamente as fontes em cada acesso. Um PDF previamente baixado precisa ter sua validade atual consultada pelo QR Code.
 
 ## Configuração e execução
+
+### Personalização e assinaturas
+
+Em Gestão → Configurações, edite títulos e textos de participante/palestrante, cor, fundo e até dois signatários com nome, cargo e imagem de assinatura opcional. Campos da API: `title`, `speakerTitle`, `body`, `speakerBody`, `accentColor` (`#RRGGBB`), `background` e `signatories: [{name,role,image}]`. Textos aceitam `{{name}}`, `{{activity}}`, `{{event}}`, `{{hours}}` e `{{organization}}`; marcadores desconhecidos são rejeitados e conteúdo HTML é escapado.
+
+As imagens usam data URLs PNG/JPEG, nunca URLs externas. O cliente reduz os arquivos e o servidor decodifica, limita dimensões/tamanho, remove metadados e normaliza para PNG. SVG e dados inválidos são rejeitados. O Gateway limita esse formulário a 2 MiB e o Nginx a 2 MiB. A prévia usa o modelo salvo e identifica explicitamente que não tem validade.
+
+O modelo pertence à tabela `certificate_templates`, no banco Certificate. Pode ser alterado em rascunhos e eventos publicados, para próximas emissões; eventos cancelados não podem alterá-lo. Cada emissão copia o modelo, fundo e signatários para seu snapshot imutável, incluído no hash. Mudar o modelo não altera certificados anteriores. As assinaturas são imagens de apresentação, **não assinaturas criptográficas ICP-Brasil**.
+
+### Emissão automática para palestrantes
+
+No editor do rascunho, ative `autoSpeakerCertificates` e vincule um palestrante com ID a cada atividade. Essa configuração, programação e preços ficam fixos após publicação. O worker Certificate verifica os eventos habilitados a cada 30 segundos por uma API privada paginada de Events. Após o término de cada atividade publicada, emite para o palestrante vinculado, mesmo sem conta de participante. Não exige inscrição/presença do palestrante e não envia e-mail automaticamente.
+
+Os documentos pertencem a `speaker_certificates`, com unicidade `(event_id, activity_id, speaker_id)`, bloqueio por evento e snapshot próprio. Reinícios, workers concorrentes e a ação “Verificar emissões agora” não duplicam emissões. Atividades futuras, eventos cancelados e vínculos ausentes não geram documento. Downloads e verificação pública revalidam integridade, estado e vínculo; cancelamento invalida o documento. A verificação pública usa a mesma rota dos participantes e omite contatos, imagens e IDs internos do palestrante.
+
+Novos testes: `python -m unittest discover -s tests/unit -v` (dependências dos serviços e PyMuPDF para inspeção do PDF). Integração com Docker: `node --test tests/integration/organizer-features.test.mjs`. Esse teste usa somente contas/eventos sintéticos e desloca as datas exclusivamente do evento identificado pelo UUID e título de QA, sem alterar o relógio da máquina.
 
 Variáveis: `PGHOST`, `PGPORT`, `PGDATABASE=certificate_db`, `PGUSER`, `PGPASSWORD`, `IDENTITY_URL`, `EVENTS_URL`, `REGISTRATIONS_URL`, `ATTENDANCE_URL`, `INTERNAL_API_KEY`, `PUBLIC_BASE_URL` (padrão `http://localhost:8080`). O link de validação é `${PUBLIC_BASE_URL}/api/certificates/verify/:code`; configure a base pública estável na implantação.
 

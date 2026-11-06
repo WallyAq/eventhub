@@ -12,6 +12,7 @@ Base externa `/api`. Gateway encaminha somente rotas explícitas; callbacks `/in
 | GET /events/:id?managed=true | Detalhe com contatos; exige vínculo com a organização, inclusive se publicado |
 | POST /events | Cria rascunho para uma organização do usuário |
 | PUT /events/:id | Substitui somente rascunho, sem transferir organização |
+| PATCH /events/:id/public-information | Atualiza informações públicas de evento publicado e enfileira aviso aos inscritos; não modifica período/vagas/preços/programação |
 | POST /events/:id/publish | Publica antes do início; repetição é idempotente |
 | POST /events/:id/cancel | Cancela sem republicação; repetição é idempotente |
 
@@ -95,3 +96,11 @@ Envelope v1: id, type, version, registrationId, userId. Tipos: registration.rese
 POST /auth/password/forgot aceita email e retorna 202 genérico. POST /auth/password/reset aceita token e password (8–128 caracteres). Tokens aleatórios são armazenados como hash, expiram em 30 minutos e são consumidos uma vez; redefinir invalida os outros links do usuário. Limite separado de dez chamadas por IP em quinze minutos.
 
 Por padrão, entrega em arquivos privados de /tmp/eventhub-mail dentro do Identity, sem endpoint público para consultar links. Arquivo: SHA-256 do e-mail normalizado + .json; contém path com token no fragmento da URL. Operador local pode inspecionar com docker compose exec identity; não publique esses arquivos ou tokens. Caixa efêmera em recriação do contêiner. SMTP configurável utiliza outbox durável. Logout revoga um token; troca/reset de senha e confirmação de e-mail invalidam todas as sessões anteriores. Consulte [Identity](identity.md) para contratos de sessão, e-mail e transporte, [gestão de inscritos](organizer-registrations.md), [presença](attendance.md), [certificados](certificates.md) e [relatórios](reporting.md) para os domínios novos.
+
+## Lotes e categorias de preço
+
+Cada atividade pode definir `priceOptions` (até 20 combinações). Cada opção contém `id` UUID, `lotName`, `category`, `priceCents` inteiro entre 0 e 10.000.000, `startsAt` e `endsAt` com fuso. O término das vendas deve ser posterior ao início e até o início do evento. IDs não podem se repetir na atividade. O preço de referência da atividade é o menor preço configurado. Sem opções, o preço único anterior continua funcionando.
+
+Com opções configuradas, `POST /registrations` exige `priceOptionId` da atividade. O servidor, sob o bloqueio do inventário, verifica `startsAt <= agora < endsAt` e fixa preço/categoria/lote no snapshot; não aceita um valor enviado pelo cliente. Ausência, opção de outra atividade ou período fechado retornam `409`. A mesma chave de idempotência não pode ser reutilizada para outra opção. O checkout apresenta somente opções abertas e exige a escolha antes de reservar.
+
+As vagas são compartilhadas pela atividade, sem cotas separadas por lote/categoria. A categoria é autodeclarada. Preço da reserva e da fila de espera permanece o contratado, inclusive quando o lote encerra antes do pagamento ou da promoção da fila. As opções são configuradas no modal da atividade do rascunho; a publicação congela preços e programação.

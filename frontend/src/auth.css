@@ -11,3 +11,4 @@
 .label-row a.text-button:hover{text-decoration:underline}
 .login-card .login-recovery-link{align-self:flex-end;margin-top:2px;color:#4f46e5;font-size:12px;line-height:16px;text-decoration:none}
 .login-card .login-recovery-link:hover{text-decoration:underline}
+.required-mark::after{content:"*"}

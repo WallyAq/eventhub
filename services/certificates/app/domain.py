@@ -164,6 +164,8 @@ def issue(value: Issue, authorization: str = Header(default="")):
             raise HTTPException(409, {"code": reason, "message": "A inscrição deixou de atender aos requisitos."})
         row = conn.execute("SELECT * FROM certificates WHERE registration_id=%s", (value.registrationId,)).fetchone()
         if not row:
+            from .templates import template_for
+            snapshot["certificateTemplate"] = template_for(conn, event["id"])
             row = conn.execute("""INSERT INTO certificates
                 (id,registration_id,user_id,event_id,activity_id,verification_code,snapshot,digest,issued_at)
                 VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s) RETURNING *""",
@@ -185,11 +187,19 @@ def listing(authorization: str = Header(default="")):
 
 @router.get("/certificates/verify/{code}")
 def verify(code: str = Path(pattern=r"^[a-f0-9]{64}$")):
+    speaker = False
     with db() as conn:
         row = conn.execute("SELECT * FROM certificates WHERE verification_code=%s", (code,)).fetchone()
+        if not row:
+            row = conn.execute("SELECT * FROM speaker_certificates WHERE verification_code=%s", (code,)).fetchone()
+            speaker = row is not None
     if not row:
         raise HTTPException(404, "Certificado não encontrado.")
-    reason = validity(row, *current(row["registration_id"]))
+    if speaker:
+        from .speakers import validity as speaker_validity
+        reason = speaker_validity(row, remote("EVENTS", "/events/" + str(row["event_id"]))["event"])
+    else:
+        reason = validity(row, *current(row["registration_id"]))
     snapshot = row["snapshot"]
     # Deliberately excludes user/registration/attendance IDs, CPF, phone and e-mail.
     return {"valid": reason is None, "reason": reason, "certificate": {

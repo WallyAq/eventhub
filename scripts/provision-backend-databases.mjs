@@ -7,4 +7,4 @@ const result = spawnSync('docker', ['compose', 'exec', '-T', 'postgres', 'sh', '
 if (result.error || result.status !== 0) {
   console.error('Não foi possível provisionar os bancos. Confirme que o PostgreSQL está saudável e recebeu as variáveis atualizadas do Compose. Nenhum volume deve ser removido.');
   process.exitCode = 1;
-} else console.log('Oito bancos de domínio provisionados; dados e senhas existentes preservados.');
+} else console.log('Bancos de domínio e do provedor simulado provisionados; dados e senhas existentes preservados.');

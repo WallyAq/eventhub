@@ -1,3 +1,4 @@
+import { RequiredMark } from '../form/RequiredMark';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -33,11 +34,11 @@ export function AccountLogin({ area }: { area: AccessArea }) {
     {location.state?.registered && <p className="success" role="status">Conta criada. Entre com seu e-mail e senha.</p>}
     {auth.notice && <p className="info" role="status">{auth.notice}</p>}
     <form onSubmit={submit} aria-busy={busy}><fieldset disabled={busy}>
-      <div className="form-field"><label htmlFor="login-email">E-mail</label><div className="email-control login-control">
+      <div className="form-field"><label htmlFor="login-email">E-mail<RequiredMark /></label><div className="email-control login-control">
         <span className="control-icon"><img src="/figma/88513.svg" alt="" /></span>
         <input id="login-email" name="email" type="email" autoComplete="email" placeholder="seu.email@instituicao.com.br" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} />
       </div></div>
-      <div className="form-field"><label htmlFor="login-password">Senha</label>
+      <div className="form-field"><label htmlFor="login-password">Senha<RequiredMark /></label>
         <PasswordInput login id="login-password" name="password" autoComplete="current-password" placeholder="••••••••••••" required minLength={8} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} />
         <Link className="text-button login-recovery-link" to={'/recuperar-senha?area='+area}>Esqueci minha senha</Link>
       </div>

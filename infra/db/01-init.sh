@@ -22,4 +22,5 @@ create_service_db notification_db notification_user "$NOTIFICATION_DB_PASSWORD"
 create_service_db attendance_db attendance_user "$ATTENDANCE_DB_PASSWORD"
 create_service_db certificate_db certificate_user "$CERTIFICATE_DB_PASSWORD"
 create_service_db reporting_db reporting_user "$REPORTING_DB_PASSWORD"
+create_service_db provider_db provider_user "$PROVIDER_DB_PASSWORD"
 

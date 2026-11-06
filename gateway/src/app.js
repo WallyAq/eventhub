@@ -10,6 +10,9 @@ export function createApp(services, request = fetch, verify) {
   app.set('trust proxy', 1);
   app.use(requestLogging);
   app.use(createHealthRouter(services, request));
+  // Image data is accepted only by the authenticated certificate settings route.
+  app.use(/^\/organizer\/events\/[^/]+\/certificate-settings$/, express.json({ limit: '2mb' }));
+  app.use(/^\/events(?:\/[^/]+(?:\/public-information)?)?$/, express.json({ limit: '1mb' }));
   app.use(express.json({ limit: '16kb' }));
   if (services.identity && verify) app.use(createIdentityRouter(services.identity, verify, request));
   if (verify) app.use(createBusinessRouter(services, verify, request));

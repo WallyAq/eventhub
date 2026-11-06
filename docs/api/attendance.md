@@ -5,13 +5,18 @@ Base externa `/api`; serviço `attendance` na porta interna 8000, com banco excl
 | Método e rota | Acesso e resposta |
 | --- | --- |
 | POST /attendance/check-ins | Organizador vinculado ao evento; recebe `{registrationId}` e retorna `{attendance}` |
+| POST /attendance/credentials/resolve | Organizador vinculado; recebe `{eventId, activityId?, credential}` e retorna `{registration, attendance}` para conferência antes do check-in |
 | GET /attendance/registrations/:id | Titular da inscrição ou organizador vinculado; retorna `{attendance: objeto ou null}` |
 | GET /organizer/events/:id/attendance | Organizador vinculado; filtros `activityId`, `page` (1–100000), `limit` (1–100, padrão 25); retorna `{attendance: [], total, page, limit}` |
 | GET /internal/attendance/registrations/:id | Credencial interna; `{attendance: objeto ou null}`; não publicado pelo Gateway |
 | GET /internal/attendance/events/:id | Credencial interna; `limit` (1–500), `offset` (0–1000000); `{attendance: [], total, limit, offset}`; não publicado pelo Gateway |
 | GET /health, GET /ready | Saúde e conexão com o banco próprio |
 
-O organizador informa o ID verdadeiro da inscrição, sem QR fictício. O Identity valida a sessão; o Event verifica o vínculo com a organização mediante `?managed=true`; Registration fornece a inscrição pela API interna. Somente uma inscrição `CONFIRMED` em evento `PUBLISHED` pode registrar presença. Inscrição de outra atividade/evento não é aceita.
+O organizador pode selecionar uma inscrição, ler o QR pela câmera, enviar uma imagem PNG/JPEG ou colar a credencial. A câmera requer HTTPS ou localhost e autorização explícita; a captura é encerrada ao detectar um código, desligar ou fechar o modal. O QR real fica no comprovante e em Minhas inscrições, para inscrições confirmadas. A leitura apenas consulta e mostra nome, e-mail e atividade; a confirmação usa `POST /attendance/check-ins`.
+
+O Identity valida a sessão; o Event verifica o vínculo com a organização mediante `?managed=true`, antes de consultar a credencial. Registration valida o HMAC-SHA256 de `eventhub:check-in:v1:<registrationId>:<assinatura>`, vinculado também ao usuário e à atividade, utilizando a chave interna. Não aceita URLs arbitrárias, credenciais adulteradas ou de outro evento/atividade. A resolução interna não é publicada pelo Gateway. A rotação da chave interna exige atualizar o QR exibido; comprovantes antigos devem ser reabertos.
+
+Somente uma inscrição `CONFIRMED` em evento `PUBLISHED` pode registrar presença. A resolução também confere a janela de presença; a confirmação revalida as condições atuais.
 
 O período de credenciamento vai do início da atividade até 24 horas após seu término, com as duas extremidades incluídas. A marcação usa o relógio do servidor; o cliente não pode fornecer uma data de presença nem substituir o responsável. O banco grava `id`, `registrationId`, `eventId`, `activityId`, `userId`, `markedBy`, `checkedInAt`, `createdAt` e os títulos do evento e atividade. Não armazena CPF, telefone, e-mail ou informações bancárias.
 

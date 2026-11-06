@@ -10,7 +10,11 @@ Entrega de 04/11/2026: novas referências de inscrições/perfil aplicadas com c
 
 A [validação do backend acadêmico](validation/2026-11-04-backend-implemented.md) registra 112 testes unitários, 39 testes de interface controlada e 18 cenários de integração real aprovados. Cobre os oito serviços, autorização, presença, PDF, replay de mensagens e sessões.
 
-1. Integrar telas organizadoras às novas APIs de inscritos, presença e relatórios; integrar a tela de confirmação de e-mail. O backend dessas operações está implementado e documentado. O botão de certificado do participante já utiliza a API.
+Entrega de 06/11/2026: gestão de inscritos e presença integradas, leitura real de QR pela câmera/imagem, modelos de certificado e signatários, lotes/categorias de preço e emissão automática para palestrantes. Consulte a [validação e uso](validation/2026-11-06-organizer-features.md).
+
+RF07/RF08 complementados: provedor externo simulado com idempotência e recuperação, notificações explícitas de pagamento, alterações públicas/cancelamento com outbox e avisos por usuário. SMTP configurável documentado e protocolo validado localmente; entrega externa ainda depende do servidor/credenciais escolhidos.
+
+1. Integrar telas dedicadas de relatórios e a tela de confirmação de e-mail. O backend dessas operações está implementado e documentado. O botão de certificado do participante já utiliza a API.
 2. Configurar e testar entrega SMTP com um servidor escolhido quando for necessário enviar e-mails externos. O padrão mailbox mantém a demonstração local; pagamento continua simulado por decisão do usuário.
 3. Para implantação pública: preparar backup e restauração testada, CI, monitoramento e identidades internas específicas por serviço. A credencial interna atual é compartilhada somente na rede Docker.
 4. Preparar demonstração e endereço externo após validação local. Nenhum túnel é iniciado automaticamente. Integração com cobrança real depende de um novo escopo.
