@@ -1,2 +1,0 @@
--r ../../services/certificates/requirements.txt
-PyMuPDF==1.26.7
