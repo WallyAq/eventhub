@@ -1,3 +1,4 @@
+import { MaskedInput, formatInput, unmask } from '../components/form/MaskedInput';
 import { RequiredMark } from '../components/form/RequiredMark';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -8,16 +9,6 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError, errorMessage, getProfile, updateProfile } from '../services/identity';
 import type { User } from '../types/auth';
 import './participant-profile.css';
-
-function displayCpf(value?: string | null) {
-  const digits = value?.replace(/\D/g, '') || '';
-  return digits.length === 11 ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}` : value || 'Não informado';
-}
-
-function displayPhone(value?: string | null) {
-  const digits = value?.replace(/\D/g, '') || '';
-  return digits.length === 10 || digits.length === 11 ? `(${digits.slice(0, 2)}) ${digits.slice(2, -4)}-${digits.slice(-4)}` : value || 'Não informado';
-}
 
 export function ProfilePage() {
   const { session, setUser, signOut } = useAuth();
@@ -71,7 +62,7 @@ export function ProfilePage() {
     const requestEpoch = saveEpoch.current;
     saving.current = true; setBusy(true); setError(''); setSuccess('');
     try {
-      const user = await updateProfile(requestToken, name, { cpf, phone });
+      const user = await updateProfile(requestToken, name, { cpf: unmask(cpf, 'cpf'), phone: unmask(phone, 'phone') });
       if (!mounted.current || currentToken.current !== requestToken || saveEpoch.current !== requestEpoch) return;
       setUser(user); setProfile(user); restoreFields(user); setEditing(false); setSuccess('Dados atualizados.');
     } catch (error) {
@@ -97,16 +88,16 @@ export function ProfilePage() {
         {editing ? <form onSubmit={submit} aria-busy={busy}><fieldset disabled={busy}>
           <div className="participant-profile__fields">
             <div className="form-field"><label htmlFor="profile-name">Nome completo<RequiredMark /></label><input id="profile-name" autoFocus autoComplete="name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="profile-cpf">CPF</label><input id="profile-cpf" inputMode="numeric" maxLength={14} placeholder="123.456.789-10" value={cpf} onChange={e => setCpf(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="profile-phone">Telefone</label><input id="profile-phone" type="tel" autoComplete="tel" maxLength={30} placeholder="(85) 91234-5678" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="profile-cpf">CPF</label><MaskedInput mask="cpf" id="profile-cpf" placeholder="123.456.789-10" value={cpf} onValueChange={setCpf} /></div>
+            <div className="form-field"><label htmlFor="profile-phone">Telefone</label><MaskedInput mask="phone" id="profile-phone" autoComplete="tel" placeholder="(85) 91234-5678" value={phone} onValueChange={setPhone} /></div>
             <div className="form-field"><label htmlFor="profile-email">E-mail</label><input id="profile-email" type="email" autoComplete="email" aria-describedby="profile-email-help" value={profile.email} readOnly /><small id="profile-email-help">Utilizado para comunicações institucionais e login de acesso. A alteração de e-mail ainda não está disponível.</small></div>
           </div>
           <div className="participant-profile__footer"><button className="secondary-button" type="button" onClick={cancelEditing}>Cancelar</button><button className="primary-button" type="submit">{busy ? 'Salvando…' : 'Salvar alterações'}</button></div>
         </fieldset></form> : <>
           <dl className="participant-profile__readout">
             <div className="participant-profile__full"><dt>Nome completo</dt><dd>{profile.name}</dd></div>
-            <div><dt>CPF</dt><dd>{displayCpf(profile.cpf)}</dd></div>
-            <div><dt>Telefone</dt><dd>{displayPhone(profile.phone)}</dd></div>
+            <div><dt>CPF</dt><dd>{formatInput(profile.cpf || '', 'cpf') || 'Não informado'}</dd></div>
+            <div><dt>Telefone</dt><dd>{formatInput(profile.phone || '', 'phone') || 'Não informado'}</dd></div>
             <div className="participant-profile__full"><dt>E-mail</dt><dd>{profile.email}</dd><p>Utilizado para comunicações institucionais e login de acesso.</p></div>
           </dl>
           {success && <p className="success participant-profile__saved" role="status">{success}</p>}

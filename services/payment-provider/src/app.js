@@ -17,8 +17,9 @@ export function createApp(pool, apiKey = process.env.PAYMENT_PROVIDER_API_KEY ||
   const app = express(); app.disable('x-powered-by');
   app.use((req, res, next) => {
     const incoming = req.get('x-request-id') || '', requestId = /^[a-zA-Z0-9-]{1,64}$/.test(incoming) ? incoming : randomUUID(), start = Date.now();
-    res.set('x-request-id', requestId);
-    res.on('finish', () => console.log(JSON.stringify({ service: 'payment-provider-simulator', requestId,
+    const candidate = req.get('x-correlation-id') || '', correlationId = /^[a-zA-Z0-9-]{1,64}$/.test(candidate) ? candidate : requestId;
+    res.set('x-request-id', requestId); res.set('x-correlation-id', correlationId);
+    res.on('finish', () => console.log(JSON.stringify({ service: 'payment-provider-simulator', requestId, correlationId,
       method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - start })));
     next();
   });

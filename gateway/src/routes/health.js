@@ -7,7 +7,7 @@ export function createHealthRouter(services, request = fetch) {
     const results = await Promise.all(Object.entries(services).map(async ([name, url]) => {
       try {
         const response = await request(url + '/ready', {
-          signal: AbortSignal.timeout(3000), headers: { 'x-request-id': req.requestId },
+          signal: AbortSignal.timeout(3000), headers: { 'x-request-id': req.requestId, 'x-correlation-id': req.correlationId },
         });
         const body = await response.json();
         return { name, status: response.ok && body.status === 'ready' ? 'ready' : 'unavailable' };

@@ -19,4 +19,9 @@ tmp/certificate-personalizado-preview.png
 tmp/render-custom-certificate.py
 tmp/rf07-*.log
 tmp/rf07-08-*.log
+tmp/rq06-*.log
+tmp/rq08-*.log
+tmp/rq08-*.json
+tmp/organization-redesign-*.log
+tmp/participant-theme-*.log
 

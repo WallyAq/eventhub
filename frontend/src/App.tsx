@@ -1,11 +1,13 @@
 import { EnvironmentPage } from './pages/EnvironmentPage';
+import { HomePage } from './pages/HomePage';
+import { AccessPage } from './pages/AccessPage';
+import { OrganizerDashboardPage, EventDashboardPage } from './pages/organization/DashboardPage';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ParticipantLoginPage } from './pages/participant/LoginPage';
 import { ParticipantRegisterPage } from './pages/participant/RegisterPage';
 import { OrganizationLoginPage } from './pages/organization/LoginPage';
 import { OrganizationRegisterPage } from './pages/organization/RegisterPage';
-import { AccessPage } from './pages/AccessPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { OrganizationsPage } from './pages/OrganizationsPage';
 import { OrganizationProfilePage } from './pages/organization/ProfilePage';
@@ -20,7 +22,7 @@ import { MyRegistrationsPage } from './pages/registrations/MyRegistrationsPage';
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Routes>
-    <Route path="/" element={<AccessPage />} />
+    <Route path="/" element={<HomePage />} />
     <Route path="/acesso" element={<AccessPage />} />
     <Route path="/participante/login" element={<ParticipantLoginPage />} />
     <Route path="/participante/cadastro" element={<ParticipantRegisterPage />} />
@@ -39,6 +41,8 @@ export default function App() {
     <Route path="/eventos/:id" element={<EventDetailsPage />} />
     <Route path="/eventos/:eventId/inscricao" element={<CheckoutPage />} />
     <Route path="/organizacao/eventos" element={<ManageEventsPage />} />
+    <Route path="/organizacao/painel" element={<OrganizerDashboardPage />} />
+    <Route path="/organizacao/eventos/:id/painel" element={<EventDashboardPage />} />
     <Route path="/organizacao/eventos/novo" element={<EventEditorPage key="new" />} />
     <Route path="/organizacao/eventos/:id" element={<EventEditorPage />} />
     <Route path="/organizacao/eventos/:id/gestao" element={<OrganizerEventPage />} />
@@ -46,7 +50,7 @@ export default function App() {
     <Route path="/pagamento/:id" element={<CheckoutPage />} />
     <Route path="/inscricoes/:id" element={<CheckoutPage />} />
     <Route path="/minhas-inscricoes" element={<MyRegistrationsPage />} />
-    <Route path="*" element={<Navigate to="/acesso" replace />} />
+    <Route path="*" element={<Navigate to="/participante/login" replace />} />
   </Routes></AuthProvider></BrowserRouter>;
 }
 

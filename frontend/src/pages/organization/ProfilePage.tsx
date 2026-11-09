@@ -1,3 +1,4 @@
+import { MaskedInput, formatInput } from '../../components/form/MaskedInput';
 import { RequiredMark } from '../../components/form/RequiredMark';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -68,18 +69,18 @@ export function OrganizationProfilePage() {
         {editing && owner ? <form onSubmit={submit}><fieldset disabled={busy}>
           <div className="organization-profile__fields">
             <div className="form-field organization-profile__full"><label htmlFor="institution-legal-name">Nome/Razão Social<RequiredMark /></label><input id="institution-legal-name" required minLength={2} maxLength={120} value={legalName} onChange={e => setLegalName(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="institution-cnpj">CNPJ<RequiredMark required={!!organization.cnpj} /></label><input id="institution-cnpj" required={!!organization.cnpj} maxLength={18} placeholder="12.345.678/0001-90" value={cnpj} onChange={e => setCnpj(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="institution-cnpj">CNPJ<RequiredMark required={!!organization.cnpj} /></label><MaskedInput mask="cnpj" id="institution-cnpj" required={!!organization.cnpj} placeholder="12.345.678/0001-90" value={cnpj} onValueChange={setCnpj} /></div>
             <div className="form-field"><label htmlFor="institution-name">Nome Fantasia ou Sigla<RequiredMark /></label><input id="institution-name" required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} /></div>
-            <div className="form-field"><label htmlFor="institution-phone">Telefone</label><input id="institution-phone" type="tel" maxLength={30} placeholder="(85) 91234-5678" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+            <div className="form-field"><label htmlFor="institution-phone">Telefone</label><MaskedInput mask="phone" autoComplete="tel" id="institution-phone" placeholder="(85) 91234-5678" value={phone} onValueChange={setPhone} /></div>
             <div className="form-field organization-profile__full"><label htmlFor="institution-email">E-mail</label><input id="institution-email" type="email" maxLength={254} aria-describedby="institution-email-help" value={email} onChange={e => setEmail(e.target.value)} /><small id="institution-email-help">Utilizado para comunicações institucionais. Sua conta pessoal de acesso é mantida.</small></div>
           </div>
           <div className="organization-profile__footer"><button type="button" className="secondary-button" onClick={cancelEditing}>Cancelar</button><button type="submit" className="primary-button">{busy ? 'Salvando…' : 'Salvar alterações'}</button></div>
         </fieldset></form> : <>
           <dl className="organization-profile__fields organization-profile__readout">
             <div className="organization-profile__full"><dt>Nome/Razão Social</dt><dd>{organization.legalName || organization.name}</dd></div>
-            <div><dt>CNPJ</dt><dd>{organization.cnpj || 'Não informado'}</dd></div>
+            <div><dt>CNPJ</dt><dd>{formatInput(organization.cnpj || '', 'cnpj') || 'Não informado'}</dd></div>
             <div><dt>Nome Fantasia ou Sigla</dt><dd>{organization.name}</dd></div>
-            <div><dt>Telefone</dt><dd>{organization.phone || 'Não informado'}</dd></div>
+            <div><dt>Telefone</dt><dd>{formatInput(organization.phone || '', 'phone') || 'Não informado'}</dd></div>
             <div className="organization-profile__full"><dt>E-mail</dt><dd>{organization.email || 'Não informado'}</dd><p>Utilizado para comunicações institucionais. Sua conta pessoal de acesso é mantida.</p></div>
           </dl>
           {success && <p className="success organization-profile__feedback" role="status">{success}</p>}

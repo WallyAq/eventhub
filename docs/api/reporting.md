@@ -1,5 +1,7 @@
 # Reporting — relatórios de eventos
 
+O frontend oferece o painel geral em `/organizacao/painel` e o painel por evento em `/organizacao/eventos/:id/painel`. O relatório inclui `registrationsByDay: [{day, count}]`, calculado pelas datas de criação das inscrições no fuso de Fortaleza. O total é diário; o frontend apresenta a soma acumulada com tabela alternativa acessível. Os agregados e o CSV continuam identificando explicitamente a receita simulada, sem cobrança real. O painel geral consulta somente eventos gerenciados pela conta e não apresenta totais incompletos como se fossem definitivos.
+
 Serviço Python/FastAPI em `services/reporting`, banco próprio `reporting_db`. Não acessa tabelas de outros serviços. Projeções `registration_projection` e `event_projection` contêm somente os dados necessários a agregados por evento/atividade, sem nome, e-mail, CPF ou telefone de participantes.
 
 ## Endpoints e autorização

@@ -31,7 +31,7 @@ test('participant profile starts in read mode, cancels drafts and saves before r
   await expect(profile).not.toContainText('Rascunho descartado');
   await page.getByRole('button', { name: 'Editar Perfil', exact: true }).click();
   await expect(page.getByLabel('Nome completo', { exact: true })).toHaveValue(participant.name);
-  await expect(page.getByLabel('Telefone', { exact: true })).toHaveValue(participant.phone!);
+  await expect(page.getByLabel('Telefone', { exact: true })).toHaveValue('(85) 91234-5678');
   await page.getByLabel('Nome completo', { exact: true }).fill('Participante Atualizado');
   await captureParticipant(page, info, 'participant-profile-edit');
   await page.getByRole('button', { name: 'Salvar alterações', exact: true }).click();

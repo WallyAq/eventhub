@@ -1,10 +1,11 @@
+import { traceHeaders, withTrace, logEvent } from './trace.js';
 import { Router } from 'express';
 import { providerPayment } from './provider.js';
 
 async function remote(service, path, authorization = '', body, requestId = '') {
   const response = await fetch(process.env[service + '_URL'] + path, {
     method: body === undefined ? 'GET' : 'POST',
-    headers: { authorization, 'x-internal-key': process.env.INTERNAL_API_KEY, 'content-type': 'application/json', ...(requestId ? { 'x-request-id': requestId } : {}) },
+    headers: { authorization, 'x-internal-key': process.env.INTERNAL_API_KEY, 'content-type': 'application/json', ...traceHeaders(), ...(requestId ? { 'x-request-id': requestId } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) throw Object.assign(new Error('Dependência indisponível ou acesso recusado.'), { status: [401,403,404,409].includes(response.status) ? response.status : 503 });
@@ -22,6 +23,7 @@ export async function migratePayments(pool) {
   )`);
   // Existing transactions retain their original decision/recovery semantics.
   await client.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_mode text NOT NULL DEFAULT 'LEGACY';
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS correlation_id varchar(64);
     ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_id uuid;
     ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_status text;
     ALTER TABLE payments ADD COLUMN IF NOT EXISTS reservation_expires_at timestamptz;
@@ -32,11 +34,14 @@ export async function migratePayments(pool) {
   finally { client.release(); }
 }
 function view(row) { return { registrationId: row.registration_id, amountCents: row.amount_cents, status: row.status, createdAt: row.created_at,
-  providerMode: row.provider_mode || 'LEGACY', providerPaymentId: row.provider_id || null, providerStatus: row.provider_status || null }; }
+  providerMode: row.provider_mode || 'LEGACY', providerPaymentId: row.provider_id || null, providerStatus: row.provider_status || null, correlationId: row.correlation_id || row.registration_id }; }
 
 export async function reconcile(pool, id, requestId = '') {
   const row = (await pool.query('SELECT * FROM payments WHERE registration_id=$1', [id])).rows[0];
-  if (!row || row.status !== 'PENDING') return row;
+  if (!row) return row;
+  return withTrace(row.correlation_id || row.registration_id, requestId, async () => {
+  if (row.status !== 'PENDING') return row;
+  logEvent('payment.reconciling', { registrationId: id });
   let decision = row.outcome;
   if (row.provider_mode === 'EXTERNAL_SIMULATOR') {
     const provider = await providerPayment(row, requestId);
@@ -46,6 +51,7 @@ export async function reconcile(pool, id, requestId = '') {
   const { registration } = await remote('REGISTRATIONS', '/internal/registrations/' + id + '/payment', '', { outcome: decision }, requestId);
   const status = registration.status === 'CONFIRMED' ? 'APPROVED' : registration.status === 'EXPIRED' || decision !== 'DECLINED' ? 'EXPIRED' : 'DECLINED';
   return (await pool.query("UPDATE payments SET status=$2 WHERE registration_id=$1 AND status='PENDING' RETURNING *", [id,status])).rows[0] || (await pool.query('SELECT * FROM payments WHERE registration_id=$1',[id])).rows[0];
+  });
 }
 
 export function createPaymentRouter(pool) {
@@ -56,6 +62,7 @@ export function createPaymentRouter(pool) {
     if (!/^[a-f0-9-]{36}$/i.test(req.params.id)) return res.status(400).json({ message:'Identificador inválido.' });
     const row=(await pool.query('SELECT * FROM payments WHERE registration_id=$1 AND user_id=$2',[req.params.id,user.id])).rows[0];
     if (!row) return res.json({ payment:null });
+    res.set('x-correlation-id', row.correlation_id || row.registration_id);
     try { res.json({payment:view(await reconcile(pool,row.registration_id,req.requestId))}); }
     catch { res.status(202).json({payment:view(row),message:'O provedor ou a confirmação está temporariamente indisponível. A mesma transação será retomada.'}); }
   });
@@ -68,11 +75,12 @@ export function createPaymentRouter(pool) {
     let row=(await pool.query('SELECT * FROM payments WHERE registration_id=$1',[req.params.id])).rows[0];
     if (!row) {
       if (registration.status!=='PENDING_PAYMENT' || registration.priceCents<=0) return res.status(409).json({message:'Reserva não está disponível para pagamento.'});
-      row=(await pool.query(`INSERT INTO payments(registration_id,user_id,amount_cents,status,outcome,provider_mode,reservation_expires_at)
-        VALUES($1,$2,$3,'PENDING',$4,'EXTERNAL_SIMULATOR',$5) ON CONFLICT DO NOTHING RETURNING *`,[req.params.id,user.id,registration.priceCents,req.body.outcome,registration.expiresAt])).rows[0]
+      row=(await pool.query(`INSERT INTO payments(registration_id,user_id,amount_cents,status,outcome,provider_mode,reservation_expires_at,correlation_id)
+        VALUES($1,$2,$3,'PENDING',$4,'EXTERNAL_SIMULATOR',$5,$6) ON CONFLICT DO NOTHING RETURNING *`,[req.params.id,user.id,registration.priceCents,req.body.outcome,registration.expiresAt,registration.correlationId || registration.id])).rows[0]
         || (await pool.query('SELECT * FROM payments WHERE registration_id=$1',[req.params.id])).rows[0];
     }
     if(row.outcome!==req.body.outcome) return res.status(409).json({message:'Esta transação já recebeu outro resultado. Consulte seu estado.'});
+    res.set('x-correlation-id', row.correlation_id || row.registration_id);
     try { row=await reconcile(pool,req.params.id,req.requestId); }
     catch { return res.status(202).json({payment:view(row),message:'Resultado registrado. A confirmação será retomada automaticamente.'}); }
     res.json({payment:view(row)});
@@ -84,8 +92,8 @@ export function startReconciliation(pool) {
   let busy=false;
   const timer=setInterval(async()=>{
     if(busy)return; busy=true;
-    try { for(const row of (await pool.query("SELECT registration_id FROM payments WHERE status='PENDING' ORDER BY created_at LIMIT 100")).rows) {
-      try { await reconcile(pool,row.registration_id); } catch { console.log(JSON.stringify({service:'payments',worker:'reconciliation',status:'retry',registrationId:row.registration_id})); }
+    try { for(const row of (await pool.query("SELECT registration_id,correlation_id FROM payments WHERE status='PENDING' ORDER BY created_at LIMIT 100")).rows) {
+      try { await reconcile(pool,row.registration_id); } catch { console.log(JSON.stringify({service:'payments',worker:'reconciliation',status:'retry',registrationId:row.registration_id,correlationId:row.correlation_id || row.registration_id})); }
     } }
     catch { console.log(JSON.stringify({service:'payments',worker:'reconciliation',status:'retry'})); }
     finally { busy=false; }

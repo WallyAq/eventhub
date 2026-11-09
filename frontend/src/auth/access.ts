@@ -19,7 +19,7 @@ export const accessAreas = {
     label: 'Organização',
     login: '/organizacao/login',
     register: '/organizacao/cadastro',
-    destination: '/organizacoes',
+    destination: '/organizacao/eventos',
     other: 'participant' as const,
     eyebrow: 'ESPAÇO DA ORGANIZAÇÃO',
     title: 'Acesse sua organização',

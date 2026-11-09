@@ -9,6 +9,7 @@ from uuid import uuid4
 import psycopg
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from .observability import request_logging
 from .domain import db, migrate, router
 from .consumer import consume
 
@@ -28,17 +29,7 @@ app = FastAPI(title="EventHub reporting", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
 
 
-@app.middleware("http")
-async def request_logging(request, call_next):
-    candidate = request.headers.get("x-request-id", "")
-    request_id = candidate if re.fullmatch(r"[a-zA-Z0-9-]{1,64}", candidate) else str(uuid4())
-    start = time.monotonic()
-    response = await call_next(request)
-    response.headers["x-request-id"] = request_id
-    logging.getLogger("uvicorn.error").info(json.dumps({"service": "reporting", "requestId": request_id,
-        "method": request.method, "path": request.url.path, "status": response.status_code,
-        "durationMs": round((time.monotonic() - start) * 1000)}))
-    return response
+app.middleware("http")(request_logging)
 
 
 @app.exception_handler(psycopg.Error)

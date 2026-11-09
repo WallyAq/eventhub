@@ -1,0 +1,214 @@
+/* The participant flow shares the organization's blue palette. Semantic status
+   colors, required marks, QR codes and certificate artwork keep their colors. */
+.participant-shell,
+.participant-auth,
+.participant-recovery {
+  --primary: #24658e;
+  --primary-text: #1b5277;
+  --border: #c9d5e2;
+  --muted: #687a8e;
+  accent-color: var(--primary);
+  background: #f7f9fd;
+}
+
+:is(.participant-shell, .participant-auth, .participant-recovery) :focus-visible {
+  outline-color: #90bdd8;
+}
+
+:is(.participant-shell, .participant-auth, .participant-recovery) .brand-logo,
+.participant-auth .profile-selector img {
+  filter: hue-rotate(-35deg);
+}
+
+.participant-shell .business-icon,
+.participant-shell .section-heading > img {
+  filter: hue-rotate(-35deg);
+}
+
+:is(.participant-shell, .participant-auth, .participant-recovery) .primary-button {
+  box-shadow: 0 1px 2px #24658e33;
+}
+
+:is(.participant-shell, .participant-auth, .participant-recovery) .primary-button:hover {
+  background: #194f73;
+}
+
+:is(.participant-shell, .participant-auth, .participant-recovery) .secondary-button:hover,
+:is(.participant-shell, .participant-auth, .participant-recovery) .password-toggle:hover,
+.participant-shell .dialog-close:hover,
+.participant-shell .account-popover > a:hover,
+.participant-shell .account-popover > button:hover {
+  background: #edf4fa;
+}
+
+.participant-shell .logout-dialog .primary-button,
+.participant-shell .logout-dialog .primary-button:hover {
+  background: #ba1a1a;
+  box-shadow: none;
+}
+
+.participant-shell .topbar,
+.participant-shell .account-trigger,
+.participant-shell .account-popover,
+.participant-shell .terms-dialog,
+.participant-shell .logout-dialog,
+.participant-auth .terms-dialog,
+.participant-auth .figma-card,
+.participant-recovery .recovery-card {
+  border-color: var(--border);
+}
+
+.participant-shell .topnav > a.active {
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.participant-shell .avatar {
+  color: var(--primary-text);
+  background: #edf4fa;
+  border-color: #ccdce8;
+}
+
+.participant-shell .popover-identity,
+.participant-auth .profile-selector nav {
+  background: #edf4fa;
+  border-color: #d8e2ed;
+}
+
+.participant-auth .profile-selector a[aria-current=page] {
+  color: var(--primary-text);
+  border-color: #d8e2ed;
+}
+
+.participant-auth .login-card .login-recovery-link,
+.participant-auth .label-row .text-button,
+.participant-auth .checkbox-row .text-button {
+  color: var(--primary-text);
+}
+
+.participant-auth .form-field input,
+.participant-auth .form-field select,
+.participant-shell .form-field input,
+.participant-shell .form-field select,
+.participant-shell .form-field textarea,
+.participant-auth .registration-card .auth-card-footer,
+.participant-auth .checkbox-row > input,
+.participant-recovery .form-field input,
+.participant-recovery .auth-card-footer,
+.participant-shell .account-popover > button {
+  border-color: #d8e2ed;
+}
+
+.participant-auth .checkbox-row > input:checked {
+  border-color: var(--primary);
+}
+
+.participant-shell .business-card,
+.participant-shell .event-card,
+.participant-shell .participant-featured-card,
+.participant-shell .participant-profile__card,
+.participant-shell .participant-profile .page-heading,
+.participant-shell .participant-profile__footer,
+.participant-shell .participant-profile__security {
+  border-color: #d5deea;
+}
+
+.participant-shell .event-meta,
+.participant-shell .participant-details__activity h3 {
+  border-color: #d5deea;
+}
+
+.participant-shell .participant-details__activity,
+.participant-shell .participant-profile .form-field > input[readonly],
+.participant-shell .my-registration-note,
+.participant-shell .my-registration-cancel-target,
+.participant-shell .my-registration-completed .my-registration-activity {
+  background: #f5f8fc;
+  border-color: #d5deea;
+}
+
+.participant-shell .participant-profile__footer,
+.participant-shell .participant-profile__security {
+  background: #fbfcfe;
+}
+
+.participant-shell .participant-profile__security-summary > button,
+.participant-shell .my-registration-tabs > button > span,
+.participant-shell .participant-pagination button[aria-current=page],
+.participant-shell .participant-pagination button:hover:not(:disabled),
+.participant-shell .my-registrations-pagination button[aria-current=page],
+.participant-shell .my-registrations-pagination button:hover:not(:disabled) {
+  background: #edf4fa;
+  border-color: #d8e2ed;
+}
+
+.participant-shell .my-registration-activity,
+.participant-shell .my-registration-reservation,
+.participant-shell .my-registration-credential {
+  background: #f1f6fb;
+  border-color: #d5deea;
+}
+
+.participant-shell .my-registration-credential-id {
+  border-color: #d5deea;
+}
+
+.participant-shell .existing-registration-notice {
+  color: var(--primary-text);
+  background: #edf4fa;
+  border-color: #ccdce8;
+}
+
+.participant-shell .participant-checkout__card,
+.participant-shell .participant-checkout__header,
+.participant-shell .participant-checkout__footer,
+.participant-shell .participant-checkout__activity ul,
+.participant-shell .participant-checkout__summary > div,
+.participant-shell .participant-checkout__receipt-actions {
+  border-color: #d5deea;
+}
+
+.participant-shell .participant-checkout__header,
+.participant-shell .participant-checkout__footer,
+.participant-shell .participant-checkout__simulation,
+.participant-shell .participant-checkout__result {
+  background: #f7f9fd;
+  border-color: #d5deea;
+}
+
+.participant-shell .participant-checkout__close:hover,
+.participant-shell .participant-checkout__steps li:not(.active)::after,
+.participant-shell .participant-checkout__steps li:not(.active) > span {
+  background: #edf4fa;
+}
+
+.participant-shell .participant-checkout__activity.selected {
+  background: #f5f8fc;
+}
+
+.participant-shell .participant-checkout__clock,
+.participant-shell .participant-checkout__selection,
+.participant-shell .participant-checkout__summary,
+.participant-shell .participant-checkout__test-card,
+.participant-shell .participant-checkout__result.confirmed {
+  background: #edf4fa;
+  border-color: #ccdce8;
+}
+
+.participant-shell .participant-checkout__personal input,
+.participant-shell .business-main .participant-checkout .participant-checkout__personal input[readonly],
+.participant-shell .participant-checkout__method-demo {
+  background: #f5f8fc;
+  border-color: #d5deea;
+}
+
+.participant-shell .participant-checkout__method-demo.participant-checkout__test-card {
+  background: #edf4fa;
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  :is(.participant-shell, .participant-auth, .participant-recovery)
+    :is(.primary-button, .secondary-button):not(:disabled):not([aria-disabled=true]):hover {
+    box-shadow: 0 4px 10px #24658e1a;
+  }
+}

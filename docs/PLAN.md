@@ -14,7 +14,7 @@ Entrega de 06/11/2026: gestão de inscritos e presença integradas, leitura real
 
 RF07/RF08 complementados: provedor externo simulado com idempotência e recuperação, notificações explícitas de pagamento, alterações públicas/cancelamento com outbox e avisos por usuário. SMTP configurável documentado e protocolo validado localmente; entrega externa ainda depende do servidor/credenciais escolhidos.
 
-1. Integrar telas dedicadas de relatórios e a tela de confirmação de e-mail. O backend dessas operações está implementado e documentado. O botão de certificado do participante já utiliza a API.
+1. Integrar a tela de confirmação de e-mail. O backend dessa operação está implementado e documentado. Os painéis de relatórios geral/por evento e o botão de certificado do participante já utilizam as APIs.
 2. Configurar e testar entrega SMTP com um servidor escolhido quando for necessário enviar e-mails externos. O padrão mailbox mantém a demonstração local; pagamento continua simulado por decisão do usuário.
 3. Para implantação pública: preparar backup e restauração testada, CI, monitoramento e identidades internas específicas por serviço. A credencial interna atual é compartilhada somente na rede Docker.
 4. Preparar demonstração e endereço externo após validação local. Nenhum túnel é iniciado automaticamente. Integração com cobrança real depende de um novo escopo.

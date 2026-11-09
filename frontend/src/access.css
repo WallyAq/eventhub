@@ -1,1 +1,15 @@
-.access-main{display:block;min-height:calc(100vh - 164px);padding:56px 0}.access-intro{text-align:center;margin-bottom:36px}.access-intro h1{font-size:clamp(32px,4vw,48px);margin:18px 0;letter-spacing:-1.5px}.access-intro>p,.access-card>p{color:#777587;line-height:1.8}.access-options{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:940px;margin:auto}.access-card{padding:32px;border:1px solid #e1e8fd;border-radius:12px;background:white}.organization-access-card{background:#f1f3ff}.access-number{display:block;font-size:14px;font-weight:600;color:#4f46e5;margin-bottom:28px}.access-card h2{margin-top:18px;font-size:28px}.access-card p{font-size:14px;min-height:76px}.access-action{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:13px 18px;border-radius:8px;background:#4f46e5;color:white;text-decoration:none;font-size:14px;margin-top:24px}.access-action:hover{background:#4338ca}.access-register{display:block;text-align:center;font-size:12px;color:#3525cd;margin-top:18px;text-underline-offset:4px}.access-note{max-width:750px;margin:28px auto 0;text-align:center;font-size:12px;color:#777587;line-height:1.8}.access-shell footer a{color:inherit;text-underline-offset:4px}@media(max-width:850px){.access-options{grid-template-columns:1fr}.access-card{padding:26px}.access-card p{min-height:0}.access-main{padding:40px 0}.access-number{margin-bottom:20px}}
+.login-choice-page{min-height:100dvh;padding:48px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;background:#f7f9fd;--primary:#24658e;--primary-text:#1b5277;--border:#c9d5e2;--muted:#687a8e}
+.login-choice-page .brand-logo{filter:hue-rotate(-35deg)}
+.login-choice{width:100%;max-width:760px;text-align:center}
+.login-choice>header{margin-bottom:28px}
+.login-choice h1{font-size:28px;line-height:36px;margin-bottom:8px}
+.login-choice>header p{font-size:14px;color:var(--muted);margin:0}
+.login-choice__options{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.login-choice__options>article{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:28px;background:white;border:1px solid var(--border);border-radius:8px}
+.login-choice__options h2{font-size:20px;margin-bottom:12px}
+.login-choice__options p{font-size:14px;color:#464555;margin-bottom:24px}
+.login-choice__options .primary-button{width:100%;margin-top:auto;box-shadow:0 1px 2px #24658e33}
+.login-choice__options .primary-button:hover{background:#194f73}
+.login-choice__back{display:inline-block;margin-top:28px;font-size:13px}
+.login-choice-page :focus-visible{outline-color:#90bdd8}
+@media(max-width:600px){.login-choice-page{padding:32px 16px;gap:24px}.login-choice h1{font-size:24px;line-height:32px}.login-choice__options{grid-template-columns:1fr;gap:16px}.login-choice__options>article{padding:24px}.login-choice__options p{margin-bottom:20px}}

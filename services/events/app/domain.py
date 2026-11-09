@@ -14,6 +14,8 @@ from psycopg.rows import dict_row
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .observability import headers as trace_headers
+
 router = APIRouter()
 
 def db():
@@ -21,7 +23,7 @@ def db():
 
 def remote(url, token):
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": token}), timeout=4) as response:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": token, **trace_headers()}), timeout=4) as response:
             return json.load(response)
     except urllib.error.HTTPError as error:
         raise HTTPException(error.code if error.code in (401,403,404) else 503, "Acesso não autorizado ou dependência indisponível.")

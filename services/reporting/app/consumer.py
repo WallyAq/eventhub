@@ -4,10 +4,22 @@ import os
 from uuid import UUID
 
 import pika
+from .observability import trace_scope, log_event
 from .domain import db, reconcile, remote
 
 
 def apply_message(payload):
+    with trace_scope(payload.get("correlationId") or payload.get("registrationId"), payload.get("requestId")):
+        try:
+            result = _apply_message(payload)
+            log_event("message.processed" if result else "message.duplicate", messageId=payload.get("id"), registrationId=payload.get("registrationId"))
+            return result
+        except Exception as error:
+            log_event("message.failed", messageId=payload.get("id"), registrationId=payload.get("registrationId"), error=type(error).__name__)
+            raise
+
+
+def _apply_message(payload):
     message_id = UUID(payload["id"])
     registration_id = UUID(payload["registrationId"])
     if not isinstance(payload.get("type"), str) or not payload["type"].startswith("registration."):
@@ -59,7 +71,7 @@ def consume(stop):
                 except Exception as error:
                     tries = int((properties.headers or {}).get("attempt", 0)) + 1
                     channel.basic_publish(exchange="", routing_key=queue + ".failed" if tries >= 3 else queue,
-                        body=body, properties=pika.BasicProperties(delivery_mode=2, headers={"attempt": tries}), mandatory=True)
+                        body=body, properties=pika.BasicProperties(delivery_mode=2, message_id=properties.message_id,correlation_id=properties.correlation_id,headers={**(properties.headers or {}), "attempt": tries}), mandatory=True)
                     channel.basic_ack(method.delivery_tag)
                     print(json.dumps({"service": "reporting", "worker": "projection", "error": type(error).__name__,
                                       "attempt": tries}), flush=True)

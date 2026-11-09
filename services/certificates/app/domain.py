@@ -15,6 +15,8 @@ from fastapi import APIRouter, Header, HTTPException, Path
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
+from .observability import headers as trace_headers, trace, bind_correlation, log_event, valid_id
+
 router = APIRouter()
 
 
@@ -26,6 +28,7 @@ def remote(service, path, authorization="", internal=True):
     headers = {"authorization": authorization, "accept": "application/json"}
     if internal:
         headers["x-internal-key"] = os.environ["INTERNAL_API_KEY"]
+    headers.update(trace_headers())
     try:
         request = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers)
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -87,6 +90,8 @@ def eligibility(registration, event, attendance, now=None):
 
 def current(registration_id):
     registration = remote("REGISTRATIONS", "/internal/registrations/" + str(registration_id))["registration"]
+    bind_correlation(registration.get("correlationId", str(registration_id)))
+    log_event("registration.loaded", registrationId=str(registration_id))
     event = remote("EVENTS", "/events/" + registration["eventId"])["event"]
     attendance = remote("ATTENDANCE", "/internal/attendance/registrations/" + str(registration_id))["attendance"]
     return registration, event, attendance

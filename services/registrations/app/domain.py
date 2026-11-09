@@ -20,6 +20,8 @@ from fastapi import APIRouter, Header, HTTPException, Request, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .observability import headers as trace_headers, trace, bind_correlation, log_event, valid_id
+
 router = APIRouter()
 
 def db():
@@ -27,6 +29,7 @@ def db():
 
 def remote(service, path, authorization="", body=None):
     headers = {"authorization": authorization, "x-internal-key": os.environ["INTERNAL_API_KEY"], "content-type": "application/json"}
+    headers.update(trace_headers())
     try:
         req = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers, data=None if body is None else json.dumps(body).encode())
         with urllib.request.urlopen(req, timeout=5) as response: return json.load(response)
@@ -57,13 +60,15 @@ def migrate():
         """)
 
 def event_message(conn, row, kind, details=None):
-    message = {"id":str(uuid4()), "type":kind, "version":1, "registrationId":str(row["id"]),"userId":str(row["user_id"])}
+    message = {"id":str(uuid4()), "type":kind, "version":1, "registrationId":str(row["id"]),"userId":str(row["user_id"]), "correlationId": row["snapshot"].get("correlationId", str(row["id"])), "requestId": trace()["requestId"]}
     if details:
         message.update(details)
+    log_event("outbox.enqueued", registrationId=str(row["id"]), messageId=message["id"], type=kind, correlationId=message["correlationId"])
     conn.execute("INSERT INTO outbox(id,payload) VALUES(%s,%s::jsonb)", (message["id"],json.dumps(message)))
 
 def serialize(row):
     result = {"id":str(row["id"]),"activityId":str(row["activity_id"]),"userId":str(row["user_id"]),"status":row["status"],"priceCents":row["price_cents"],"expiresAt":row["expires_at"],"createdAt":row["created_at"],**row["snapshot"]}
+    result["correlationId"] = row["snapshot"].get("correlationId", str(row["id"]))
     if os.environ.get("INTERNAL_API_KEY"):
         result["checkInCredential"] = credential(row)
     return result
@@ -176,7 +181,7 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
         if count >= inventory["capacity"] and activity.get("waitlistEnabled", True) is False:
             raise HTTPException(409,"Atividade lotada e sem lista de espera.")
         status = "WAITLISTED" if count >= inventory["capacity"] else "PENDING_PAYMENT" if price else "CONFIRMED"
-        snapshot = {"eventId":event["id"],"eventTitle":event["title"],"activity":activity}
+        snapshot = {"eventId":event["id"],"eventTitle":event["title"],"activity":activity,"correlationId":trace()["correlationId"]}
         if rate:
             snapshot["priceOption"] = rate
         row = conn.execute("""INSERT INTO registrations(id,activity_id,user_id,request_key,status,price_cents,expires_at,snapshot)
@@ -188,6 +193,7 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
 def owned(conn,id,user):
     row=conn.execute("SELECT * FROM registrations WHERE id=%s AND user_id=%s",(id,user)).fetchone()
     if not row: raise HTTPException(404,"Inscrição não encontrada.")
+    bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
     return row
 
 @router.get("/registrations")
@@ -201,6 +207,7 @@ def detail(id:UUID,authorization: str=Header(default="")):
     user=actor(authorization)
     with db() as conn:
         row=owned(conn,id,user["id"])
+        bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         maintain(conn,lock(conn,row["activity_id"]),event)
         return {"registration":serialize(owned(conn,id,user["id"]))}
@@ -210,6 +217,7 @@ def cancel(id:UUID,authorization: str=Header(default="")):
     user=actor(authorization)
     with db() as conn:
         row=owned(conn,id,user["id"])
+        bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         inventory=lock(conn,row["activity_id"])
         row=owned(conn,id,user["id"])
@@ -225,6 +233,7 @@ def internal_detail(id:UUID,request:Request):
     with db() as conn:
         row=conn.execute("SELECT * FROM registrations WHERE id=%s",(id,)).fetchone()
         if not row: raise HTTPException(404,"Inscrição não encontrada.")
+        bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
         return {"registration":serialize(row)}
 
 
@@ -385,6 +394,7 @@ def payment(id:UUID,value:Decision,request:Request):
         row=conn.execute("SELECT * FROM registrations WHERE id=%s",(id,)).fetchone()
         if not row: raise HTTPException(404,"Inscrição não encontrada.")
         if row["price_cents"] <= 0: raise HTTPException(409,"Inscrição gratuita não possui pagamento.")
+        bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         inventory=lock(conn,row["activity_id"])
         maintain(conn,inventory,event)
@@ -420,6 +430,7 @@ class Announcement(BaseModel):
     eventId: UUID
     type: Literal["event.updated", "event.cancelled"]
     occurredAt: datetime
+    correlationId: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9-]{1,64}$")
     event: AnnouncementInfo
     changedFields: list[Literal["title", "description", "location", "streamUrl", "sessionTime", "status"]] = Field(min_length=1, max_length=6)
 
@@ -455,7 +466,7 @@ def announcement(id: UUID, value: Announcement, request: Request):
         INSERT INTO outbox(id,payload) SELECT mid,%s::jsonb || jsonb_build_object(
             'id',mid::text,'announcementId',%s::text,'registrationId',id::text,'userId',user_id::text,'version',1) FROM messages""",
             (id, value.occurredAt, json.dumps({"type": value.type, "eventId": str(id), "occurredAt": value.occurredAt.isoformat(),
-                "event": value.event.model_dump(), "changedFields": value.changedFields}), str(value.id)))
+                "event": value.event.model_dump(), "changedFields": value.changedFields, "correlationId": value.correlationId or trace()["correlationId"], "requestId": trace()["requestId"]}), str(value.id)))
         return {"accepted": True, "duplicate": False, "queued": result.rowcount}
 
 def worker(stop):
@@ -478,7 +489,8 @@ def worker(stop):
             with db() as conn:
                 rows=conn.execute("SELECT * FROM outbox WHERE published_at IS NULL LIMIT 100 FOR UPDATE SKIP LOCKED").fetchall()
                 for row in rows:
-                    channel.basic_publish(exchange="eventhub",routing_key=row["payload"]["type"],body=json.dumps(row["payload"]),properties=pika.BasicProperties(delivery_mode=2,message_id=str(row["id"])),mandatory=True)
+                    channel.basic_publish(exchange="eventhub",routing_key=row["payload"]["type"],body=json.dumps(row["payload"]),properties=pika.BasicProperties(delivery_mode=2,message_id=str(row["id"]),correlation_id=row["payload"].get("correlationId",row["payload"]["registrationId"]),headers={"x-correlation-id":row["payload"].get("correlationId",row["payload"]["registrationId"]),"x-request-id":row["payload"].get("requestId",str(row["id"]))}),mandatory=True)
+                    log_event("outbox.published", messageId=str(row["id"]), registrationId=row["payload"]["registrationId"], correlationId=row["payload"].get("correlationId",row["payload"]["registrationId"]))
                     conn.execute("UPDATE outbox SET published_at=now() WHERE id=%s",(row["id"],))
             connection.close()
         except Exception as error: print(json.dumps({"service":"registrations","worker":"outbox","error":type(error).__name__}),flush=True)

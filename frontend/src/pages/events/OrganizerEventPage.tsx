@@ -27,7 +27,7 @@ export function OrganizerEventPage() {
     <Feedback loading={loading} error={error} />
     {notice && <p className="success" role="status">{notice}</p>}
     {!loading && !error && data && <>
-      <header className="business-heading"><div><h1>{data.event.title}</h1><p>{data.event.organizationName} · {data.event.modality} · {date(data.event.startsAt)}</p><span className={'status-badge status-' + data.event.status}>{statusLabel[data.event.status]}</span></div><div className="organizer-actions"><Link className="secondary-button" to={'/organizacao/eventos/' + id}>Editar dados do evento</Link>{data.event.status === 'PUBLISHED' && <Link className="primary-button" to={'/eventos/' + id}>Ver página do evento</Link>}</div></header>
+      <header className="business-heading"><div><h1>{data.event.title}</h1><p>{data.event.organizationName} · {data.event.modality} · {date(data.event.startsAt)}</p><span className={'status-badge status-' + data.event.status}>{statusLabel[data.event.status]}</span></div><div className="organizer-actions"><Link className="secondary-button" to={'/organizacao/eventos/' + id + '/painel'}>Ver painel do evento</Link><Link className="secondary-button" to={'/organizacao/eventos/' + id}>Editar dados do evento</Link>{data.event.status === 'PUBLISHED' && <Link className="primary-button" to={'/eventos/' + id}>Ver página do evento</Link>}</div></header>
       <nav className="organizer-tabs" aria-label="Gestão do evento">{tabs.map(([key, label]) => <button type="button" key={key} aria-current={tab === key ? 'page' : undefined} onClick={() => setParams({ aba: key })}>{label}</button>)}</nav>
       {tab === 'inscricoes' && <Registrations key={id} event={data.event} />}
       {tab === 'atividades' && <Activities event={data.event} />}

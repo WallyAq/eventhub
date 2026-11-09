@@ -7,17 +7,22 @@ export function createBusinessRouter(services, verify, request = fetch) {
     res.set('Cache-Control', 'no-store');
     const name = target?.service || (req.path.startsWith('/events') ? 'events' : req.path.startsWith('/registrations') ? 'registrations' : 'payments');
     if (!(req.method === 'GET' && (name === 'events' || target?.public))) {
-      try { await verify((req.get('authorization') || '').replace(/^Bearer /, ''), { requestId: req.requestId }); }
+      try { await verify((req.get('authorization') || '').replace(/^Bearer /, ''), { requestId: req.requestId, correlationId: req.correlationId }); }
       catch (error) { return res.status(error?.status === 503 ? 503 : 401).json({ message: error?.status === 503 ? 'Serviço de identidade indisponível. Tente novamente.' : 'Faça login para continuar.', error: error?.status === 503 ? 'identity_unavailable' : 'invalid_token', requestId: req.requestId }); }
     }
     try {
-      const headers = { 'content-type': 'application/json', 'x-request-id': req.requestId };
+      const headers = { 'content-type': 'application/json', 'x-request-id': req.requestId, 'x-correlation-id': req.correlationId };
       for (const key of ['authorization', 'idempotency-key']) if (req.get(key)) headers[key] = req.get(key);
       const result = await request(services[name] + (target?.path || req.originalUrl), {
         method: req.method, headers, body: ['POST','PUT','PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
         signal: AbortSignal.timeout(15000), redirect: 'error',
       });
       const contentType = result.headers.get('content-type') || '';
+      const canonicalCorrelation = result.headers.get('x-correlation-id') || '';
+      if (/^[a-zA-Z0-9-]{1,64}$/.test(canonicalCorrelation)) {
+        req.correlationId = canonicalCorrelation;
+        res.set('x-correlation-id', canonicalCorrelation);
+      }
       if (target?.download && result.ok && /^(application\/pdf|text\/csv)(;|$)/i.test(contentType)) {
         res.set('Content-Type', contentType);
         const attachment = result.headers.get('content-disposition');

@@ -13,6 +13,8 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from .observability import headers as trace_headers, trace, bind_correlation, log_event, valid_id
+
 router = APIRouter()
 
 
@@ -23,6 +25,7 @@ def db():
 
 def remote(service, path, authorization="", body=None):
     headers = {"authorization": authorization, "x-internal-key": os.environ["INTERNAL_API_KEY"]}
+    headers.update(trace_headers())
     try:
         headers["content-type"] = "application/json"
         req = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers,
@@ -53,7 +56,10 @@ def event_detail(event_id, authorization="", managed=False):
 
 
 def registration_detail(registration_id):
-    return remote("REGISTRATIONS", "/internal/registrations/" + str(registration_id))["registration"]
+    registration = remote("REGISTRATIONS", "/internal/registrations/" + str(registration_id))["registration"]
+    bind_correlation(registration.get("correlationId", str(registration_id)))
+    log_event("registration.loaded", registrationId=str(registration_id))
+    return registration
 
 
 def migrate():

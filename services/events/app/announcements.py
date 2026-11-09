@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from . import domain
+from .observability import trace, trace_scope, log_event
 
 router = APIRouter()
 FIELDS = ("title", "description", "location", "streamUrl", "sessionTime")
@@ -39,7 +40,7 @@ def migrate():
 
 def enqueue(conn, event, kind, changed):
     payload = {"id": str(uuid4()), "eventId": event["id"], "type": kind, "occurredAt": datetime.now(timezone.utc).isoformat(),
-               "event": {key: event.get(key, "") for key in FIELDS}, "changedFields": changed}
+               "correlationId":trace()["correlationId"], "requestId":trace()["requestId"], "event": {key: event.get(key, "") for key in FIELDS}, "changedFields": changed}
     conn.execute("INSERT INTO event_notification_outbox(id,payload) VALUES(%s,%s::jsonb)", (payload["id"], json.dumps(payload)))
 
 
@@ -73,7 +74,7 @@ def deliver_once():
         for row in rows:
             payload = row["payload"]
             request = urllib.request.Request(os.environ["REGISTRATIONS_URL"] + "/internal/events/" + payload["eventId"] + "/announcements",
-                headers={"x-internal-key": os.environ["INTERNAL_API_KEY"], "content-type": "application/json"}, data=json.dumps(payload).encode())
+                headers={"x-internal-key": os.environ["INTERNAL_API_KEY"], "content-type": "application/json", "x-correlation-id":payload.get("correlationId",str(row["id"])), "x-request-id":payload.get("requestId",str(row["id"]))}, data=json.dumps({key:value for key,value in payload.items() if key != "requestId"}).encode())
             with urllib.request.urlopen(request, timeout=5) as response:
                 result = json.load(response)
                 if not result.get("accepted"):

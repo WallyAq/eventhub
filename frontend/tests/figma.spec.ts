@@ -45,8 +45,8 @@ test('participant signup, login, local icons and persisted profile', async ({ pa
   await expect(page.getByRole('button', { name: 'Editar Perfil', exact: true })).toBeVisible();
   await expect(page.getByLabel('Nome completo', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Editar Perfil', exact: true }).click();
-  await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('52998224725');
-  await expect(page.getByLabel('Telefone', { exact: true })).toHaveValue('85912345678');
+  await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
+  await expect(page.getByLabel('Telefone', { exact: true })).toHaveValue('(85) 91234-5678');
   await page.getByLabel('Nome completo', { exact: true }).fill('Pessoa QA Atualizada');
   await page.getByRole('button', { name: 'Salvar alterações', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Dados atualizados.');
@@ -90,14 +90,14 @@ test('institution signup creates an organization and profile saves real data', a
   await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill('Figma123');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL(/\/organizacoes$/);
+  await expect(page).toHaveURL(/\/organizacao\/eventos$/);
   await page.locator('.topnav').getByRole('link', { name: 'Meu Perfil' }).click();
   await expect(page.getByRole('button', { name: 'Editar Perfil', exact: true })).toBeVisible();
   await expect(page.locator('#institution-name')).toHaveCount(0);
   await expect(page.getByLabel('Senha atual', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('institution-profile-readonly.png'), fullPage: true });
   await page.getByRole('button', { name: 'Editar Perfil', exact: true }).click();
-  await expect(page.getByLabel('CNPJ', { exact: true })).toHaveValue(cnpj);
+  await expect(page.getByLabel('CNPJ', { exact: true })).toHaveValue(cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'));
   await page.getByLabel('CNPJ', { exact: true }).fill('');
   expect(await page.getByLabel('CNPJ', { exact: true }).evaluate(input => (input as HTMLInputElement).checkValidity())).toBe(false);
   expect(await page.getByLabel('CNPJ', { exact: true }).evaluate(input => (input as HTMLInputElement).validity.valueMissing)).toBe(true);

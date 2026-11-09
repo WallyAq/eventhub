@@ -8,6 +8,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from uuid import UUID
 from datetime import datetime
+from .observability import headers as trace_headers, valid_id, trace
 
 SUBJECTS = {
     "registration.confirmed": "Inscrição confirmada no EventHub",
@@ -31,6 +32,8 @@ def validate_event(payload):
     for key in ("id", "registrationId", "userId"):
         if str(UUID(payload.get(key, ""))) != payload[key]:
             raise ValueError("Invalid notification identifier")
+    if payload.get("correlationId") is not None and not valid_id(payload["correlationId"]):
+        raise ValueError("Invalid correlation identifier")
     if payload["type"].startswith("payment."):
         if type(payload.get("amountCents")) is not int or not 0 < payload["amountCents"] <= 10000000:
             raise ValueError("Invalid payment amount")
@@ -67,7 +70,7 @@ class Delivery:
 
     def _fetch(self, service, path):
         request = urllib.request.Request(self.env[service + "_URL"].rstrip("/") + path,
-                                         headers={"x-internal-key": self.env["INTERNAL_API_KEY"]})
+                                         headers={"x-internal-key": self.env["INTERNAL_API_KEY"], **trace_headers()})
         with urllib.request.urlopen(request, timeout=5) as response:
             return json.load(response)
 
@@ -115,7 +118,7 @@ class Delivery:
             text += f"Prazo da reserva: {registration['expiresAt']}\n"
         if base:
             text += f"Acompanhe em {base}/minhas-inscricoes\n" if kind.startswith("event.") else f"Acompanhe em {base}/inscricoes/{registration['id']}\n"
-        return {"id": payload["id"], "type": kind, "registrationId": payload["registrationId"], "to": user["email"], "subject": SUBJECTS[kind], "text": text}
+        return {"id": payload["id"], "type": kind, "registrationId": payload["registrationId"], "correlationId": payload.get("correlationId", payload["registrationId"]), "requestId": trace()["requestId"], "to": user["email"], "subject": SUBJECTS[kind], "text": text}
 
     def send(self, message):
         if self.mode == "mailbox":
@@ -131,6 +134,8 @@ class Delivery:
         mail["To"] = message["to"]
         mail["Subject"] = message["subject"]
         mail["Message-ID"] = f"<{message['id']}@eventhub.local>"
+        if valid_id(message.get("correlationId")):
+            mail["X-Correlation-ID"] = message["correlationId"]
         mail.set_content(message["text"])
         secure = self.env.get("SMTP_SECURE", "false") == "true"
         factory = self.smtp_factory or (smtplib.SMTP_SSL if secure else smtplib.SMTP)

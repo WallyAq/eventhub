@@ -6,7 +6,7 @@ export function createIdentityRouter(url, verify, request = fetch) {
     const match = /^Bearer ([^\s]+)$/.exec(req.get('authorization') || '');
     try {
       if (!match) throw new Error('Missing token');
-      req.identity = await verify(match[1], { requestId: req.requestId });
+      req.identity = await verify(match[1], { requestId: req.requestId, correlationId: req.correlationId });
       next();
     } catch (error) {
       const unavailable = error?.status === 503;
@@ -18,7 +18,7 @@ export function createIdentityRouter(url, verify, request = fetch) {
   const forward = async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      const headers = { 'content-type': 'application/json', 'x-request-id': req.requestId, 'x-forwarded-for': req.ip };
+      const headers = { 'content-type': 'application/json', 'x-request-id': req.requestId, 'x-correlation-id': req.correlationId, 'x-forwarded-for': req.ip };
       if (req.get('authorization')) headers.authorization = req.get('authorization');
       const upstream = await request(url + req.path, {
         method: req.method, headers,

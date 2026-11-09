@@ -5,13 +5,15 @@ import json
 import os
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
+
+from .observability import headers as trace_headers, trace, bind_correlation, log_event, valid_id
 
 router = APIRouter()
 STATUSES = ("PENDING_PAYMENT", "CONFIRMED", "CANCELLED", "EXPIRED", "WAITLISTED")
@@ -23,6 +25,7 @@ def db():
 
 def remote(service, path, authorization=""):
     headers = {"authorization": authorization, "x-internal-key": os.environ["INTERNAL_API_KEY"], "accept": "application/json"}
+    headers.update(trace_headers())
     try:
         request = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers)
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -87,7 +90,7 @@ def prepare_rows(event, registrations, attendance):
             attended = bool(marked and all(marked[field] == item[field] for field in ("eventId", "activityId", "userId")))
             rows.append({"id": item["id"], "eventId": item["eventId"], "activityId": item["activityId"],
                          "status": item["status"], "priceCents": item["priceCents"],
-                         "expiresAt": item.get("expiresAt"), "attended": attended})
+                         "expiresAt": item.get("expiresAt"), "attended": attended, "createdAt": item.get("createdAt")})
     except (KeyError, TypeError, ValueError):
         raise HTTPException(503, "As fontes retornaram dados inconsistentes para o relatório.")
     return rows
@@ -137,6 +140,14 @@ def effective_status(item, checked_at):
 
 
 def summarize(event, registrations, checked_at):
+    days = {}
+    for item in registrations:
+        if item.get("createdAt"):
+            created = datetime.fromisoformat(item["createdAt"].replace("Z", "+00:00"))
+            if not created.tzinfo:
+                raise HTTPException(503, "Data de inscrição sem fuso horário.")
+            day = created.astimezone(timezone(timedelta(hours=-3))).date().isoformat()
+            days[day] = days.get(day, 0) + 1
     counts = dict.fromkeys(STATUSES, 0)
     result = {item["id"]: {"activityId": item["id"], "title": item["title"], "capacity": item["capacity"],
               "total": 0, "byStatus": dict.fromkeys(STATUSES, 0), "attendanceCount": 0,
@@ -152,6 +163,7 @@ def summarize(event, registrations, checked_at):
         if status == "CONFIRMED":
             current["simulatedRevenueCents"] += item["priceCents"]
     return {"eventId": event["id"], "eventTitle": event["title"], "eventStatus": event["status"],
+            "registrationsByDay": [{"day": day, "count": count} for day, count in sorted(days.items())],
             "total": len(registrations), "byStatus": counts,
             "attendanceCount": sum(item["attendanceCount"] for item in result.values()),
             "confirmedAttendanceCount": sum(item["confirmedAttendanceCount"] for item in result.values()),
@@ -165,11 +177,12 @@ def report_for(event_id, authorization):
     # Explicit managed read is required even when an event is publicly visible.
     event = remote("EVENTS", "/events/" + str(event_id) + "?managed=true", authorization)["event"]
     with db() as conn:
-        snapshot, _, checked = reconcile(conn, event_id, event)
+        snapshot, source_rows, checked = reconcile(conn, event_id, event)
         # Read the projection owned by this service, not another service's tables.
         rows = conn.execute("""SELECT registration_id AS id,activity_id,status,price_cents,expires_at,attended
             FROM registration_projection WHERE event_id=%s""", (event_id,)).fetchall()
-    registrations = [{"id": str(row["id"]), "activityId": str(row["activity_id"]), "status": row["status"],
+    created_dates = {item["id"]: item.get("createdAt") for item in source_rows}
+    registrations = [{"id": str(row["id"]), "activityId": str(row["activity_id"]), "status": row["status"], "createdAt": created_dates.get(str(row["id"])),
                       "priceCents": row["price_cents"], "attended": row["attended"],
                       "expiresAt": row["expires_at"].isoformat() if row["expires_at"] else None} for row in rows]
     return summarize(snapshot, registrations, checked)

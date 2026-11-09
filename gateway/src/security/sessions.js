@@ -4,7 +4,7 @@ export function createSessionVerifier(verifyToken, identityUrl, internalKey, req
     const claims = await verifyToken(token);
     try {
       const response = await request(identityUrl + '/internal/auth/verify', {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-internal-key': internalKey, ...(context.requestId ? { 'x-request-id': context.requestId } : {}) },
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-internal-key': internalKey, ...(context.requestId ? { 'x-request-id': context.requestId } : {}), ...(context.correlationId ? { 'x-correlation-id': context.correlationId } : {}) },
         body: JSON.stringify({ token }), signal: AbortSignal.timeout(5000), redirect: 'error',
       });
       if (response.status === 401) throw Object.assign(new Error('Invalid session'), { status: 401 });

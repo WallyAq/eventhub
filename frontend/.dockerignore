@@ -4,4 +4,7 @@ dist
 .venv
 __pycache__
 .git
+test-results
+playwright-report
+tests
 

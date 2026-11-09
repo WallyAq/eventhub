@@ -3,6 +3,7 @@ import json
 import os
 import psycopg
 import pika
+from .observability import trace_scope, log_event
 from .delivery import validate_event
 
 def db(): return psycopg.connect(connect_timeout=3,options="-c statement_timeout=5000")
@@ -18,6 +19,17 @@ def migrate():
 
 
 def process_delivery(payload, delivery, connect=db):
+    with trace_scope(payload.get("correlationId") or payload.get("registrationId"), payload.get("requestId")):
+        try:
+            result = _process_delivery(payload, delivery, connect)
+            log_event("message.processed", messageId=payload.get("id"), registrationId=payload.get("registrationId"), type=payload.get("type"))
+            return result
+        except Exception as error:
+            log_event("message.failed", messageId=payload.get("id"), registrationId=payload.get("registrationId"), error=type(error).__name__)
+            raise
+
+
+def _process_delivery(payload, delivery, connect=db):
     validate_event(payload)
     failed = False
     with connect() as conn:
@@ -58,7 +70,7 @@ def consume(stop, delivery):
                     channel.basic_ack(method.delivery_tag)
                 except Exception:
                     tries=retry_attempt(properties.headers)
-                    channel.basic_publish(exchange="",routing_key="notifications.failed" if tries>=3 else "notifications",body=body,properties=pika.BasicProperties(delivery_mode=2,headers={"attempt":tries}))
+                    channel.basic_publish(exchange="",routing_key="notifications.failed" if tries>=3 else "notifications",body=body,properties=pika.BasicProperties(delivery_mode=2,message_id=properties.message_id,correlation_id=properties.correlation_id,headers={**(properties.headers or {}),"attempt":tries}))
                     channel.basic_ack(method.delivery_tag)
                     stop.wait(1)
             channel.cancel()
