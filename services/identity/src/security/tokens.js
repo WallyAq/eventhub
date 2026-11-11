@@ -8,7 +8,7 @@ export async function createTokens(privateBase64, publicBase64, sessions) {
   return {
     expiresIn: 3600,
     async issue(user) {
-      return new SignJWT({ role: user.role, sv: user.credentialsVersion ?? 0 })
+      return new SignJWT({ role: user.role, organizationId: user.organizationId ?? null, sv: user.credentialsVersion ?? 0 })
         .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
         .setIssuer('eventhub-identity').setAudience('eventhub-api')
         .setSubject(user.id).setJti(randomUUID()).setIssuedAt().setExpirationTime('1h').sign(privateKey);
@@ -18,7 +18,9 @@ export async function createTokens(privateBase64, publicBase64, sessions) {
         algorithms: ['RS256'], issuer: 'eventhub-identity', audience: 'eventhub-api',
         requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '1h',
       });
-      if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || payload.role !== 'PARTICIPANT') throw new Error('Invalid claims');
+      if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || !['PARTICIPANT', 'ORGANIZER'].includes(payload.role)) throw new Error('Invalid claims');
+      if (payload.role === 'ORGANIZER' ? !/^[a-f0-9-]{36}$/i.test(payload.organizationId || '') : payload.organizationId != null)
+        throw new Error('Invalid institution claims');
       if (payload.sv !== undefined && (!Number.isSafeInteger(payload.sv) || payload.sv < 0)) throw new Error('Invalid session version');
       if (sessions) {
         let valid;

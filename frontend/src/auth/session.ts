@@ -9,7 +9,7 @@ function tokenDeadline(token: string, user: User): number {
   if (segments.length !== 3) throw new Error('Sessão inválida.');
   const encoded = segments[1].replace(/-/g, '+').replace(/_/g, '/');
   const claims = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
-  if (claims.sub !== user.id || claims.role !== 'PARTICIPANT' || claims.iss !== 'eventhub-identity'
+  if (claims.sub !== user.id || claims.role !== user.role || (claims.organizationId ?? null) !== user.organizationId || claims.iss !== 'eventhub-identity'
       || claims.aud !== 'eventhub-api' || !Number.isFinite(claims.exp) || !Number.isFinite(claims.iat)
       || claims.exp <= claims.iat || claims.exp - claims.iat > 3600)
     throw new Error('Sessão inválida.');
@@ -25,7 +25,9 @@ export function readSession(): Session | null {
   try {
     const session: Session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
     const user = session?.user;
-    if (!session || typeof session.token !== 'string' || !user || user.role !== 'PARTICIPANT'
+    if (user && user.organizationId === undefined && user.role === 'PARTICIPANT') user.organizationId = null;
+    if (!session || typeof session.token !== 'string' || !user || !['PARTICIPANT', 'ORGANIZER'].includes(user.role)
+        || (user.role === 'PARTICIPANT' ? user.organizationId !== null : typeof user.organizationId !== 'string' || !user.organizationId)
         || ['id', 'name', 'email', 'createdAt', 'updatedAt'].some(key => typeof user[key as keyof User] !== 'string')
         || !Number.isFinite(session.expiresAt)) return null;
     const expiresAt = Math.min(session.expiresAt, tokenDeadline(session.token, user));

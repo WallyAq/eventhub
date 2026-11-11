@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group">
+<path id="Vector" d="M11 11L3.00002 3" stroke-width="1.66667" stroke-linecap="round" stroke="#226192" stroke-opacity="0.5"/>
+<path id="Vector_2" d="M11 11L19 3" stroke-width="1.66667" stroke-linecap="round" stroke="#226192" stroke-opacity="0.5"/>
+<path id="Vector_3" d="M11 11L3.00002 19" stroke-width="1.66667" stroke-linecap="round" stroke="#226192" stroke-opacity="0.5"/>
+<path id="Vector_4" d="M11 11L19 19" stroke-width="1.66667" stroke-linecap="round" stroke="#226192" stroke-opacity="0.5"/>
+<path id="Vector_5" d="M2.00272e-05 3C2.00272e-05 4.65575 1.34427 6 3.00002 6C4.65577 6 6.00002 4.65575 6.00002 3C6.00002 1.34425 4.65577 0 3.00002 0C1.34427 0 2.00272e-05 1.34425 2.00272e-05 3V3" fill="#226192" fill-opacity="0.85"/>
+<path id="Vector_6" d="M16 3C16 4.65575 17.3443 6 19 6C20.6558 6 22 4.65575 22 3C22 1.34425 20.6558 0 19 0C17.3443 0 16 1.34425 16 3V3" fill="#226192"/>
+<path id="Vector_7" d="M2.00272e-05 19C2.00272e-05 20.6557 1.34427 22 3.00002 22C4.65577 22 6.00002 20.6557 6.00002 19C6.00002 17.3443 4.65577 16 3.00002 16C1.34427 16 2.00272e-05 17.3443 2.00272e-05 19V19" fill="#226192"/>
+<path id="Vector_8" d="M16 19C16 20.6557 17.3443 22 19 22C20.6558 22 22 20.6557 22 19C22 17.3443 20.6558 16 19 16C17.3443 16 16 17.3443 16 19V19" fill="#226192" fill-opacity="0.85"/>
+<path id="Vector_9" d="M6.33335 11C6.33335 13.5756 8.42442 15.6667 11 15.6667C13.5756 15.6667 15.6667 13.5756 15.6667 11C15.6667 8.4244 13.5756 6.33333 11 6.33333C8.42442 6.33333 6.33335 8.4244 6.33335 11V11" fill="#EEF2FF" stroke-width="1.66667" stroke="#226192"/>
+<path id="Vector_10" d="M9 9.58334C9 10.8711 10.0455 11.9167 11.3333 11.9167C12.6211 11.9167 13.6667 10.8711 13.6667 9.58334C13.6667 8.29553 12.6211 7.25 11.3333 7.25C10.0455 7.25 9 8.29553 9 9.58334V9.58334" fill="#226192"/>
+</g>
+</svg>

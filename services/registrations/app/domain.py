@@ -10,6 +10,7 @@ import secrets
 import hashlib
 import hmac
 import re
+from pathlib import Path
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from typing import Literal
@@ -39,12 +40,27 @@ def remote(service, path, authorization="", body=None):
 
 def actor(token): return remote("IDENTITY", "/users/me", token)["user"]
 
+
+def participant(token):
+    user = actor(token)
+    if user.get("role") != "PARTICIPANT":
+        raise HTTPException(403, "Esta operação exige uma conta de participante.")
+    return user
+
+
+def reservation_ttl():
+    value = int(os.environ.get("RESERVATION_TTL_SECONDS", "900"))
+    if value <= 0:
+        raise ValueError("RESERVATION_TTL_SECONDS must be positive")
+    return value
+
 def secured(request):
     expected = os.environ.get("INTERNAL_API_KEY", "")
     if not expected or not secrets.compare_digest(request.headers.get("x-internal-key", ""), expected):
         raise HTTPException(401, "Credencial interna inválida.")
 
 def migrate():
+    reservation_ttl()
     with db() as conn:
         conn.execute("SELECT pg_advisory_xact_lock(43001)")
         conn.execute("""CREATE TABLE IF NOT EXISTS inventories(activity_id uuid PRIMARY KEY,event_id uuid NOT NULL,capacity int NOT NULL CHECK(capacity>0));
@@ -58,6 +74,17 @@ def migrate():
         CREATE TABLE IF NOT EXISTS payment_notification_receipts(registration_id uuid PRIMARY KEY REFERENCES registrations(id),result text NOT NULL);
         CREATE TABLE IF NOT EXISTS event_announcement_receipts(id uuid PRIMARY KEY,event_id uuid NOT NULL);
         """)
+        conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations(name text PRIMARY KEY,checksum text NOT NULL,applied_at timestamptz NOT NULL DEFAULT now())")
+        for file in sorted(Path(__file__).with_name("migrations").glob("*.sql")):
+            sql = file.read_text(encoding="utf-8").replace("\r\n", "\n")
+            checksum = hashlib.sha256(sql.encode()).hexdigest()
+            applied = conn.execute("SELECT checksum FROM schema_migrations WHERE name=%s", (file.name,)).fetchone()
+            if applied:
+                if applied["checksum"] != checksum:
+                    raise RuntimeError("Applied migration was modified: " + file.name)
+                continue
+            conn.execute(sql)
+            conn.execute("INSERT INTO schema_migrations(name,checksum) VALUES(%s,%s)", (file.name, checksum))
 
 def event_message(conn, row, kind, details=None):
     message = {"id":str(uuid4()), "type":kind, "version":1, "registrationId":str(row["id"]),"userId":str(row["user_id"]), "correlationId": row["snapshot"].get("correlationId", str(row["id"])), "requestId": trace()["requestId"]}
@@ -111,7 +138,7 @@ def maintain(conn, inventory, event=None):
     count = conn.execute("SELECT count(*) AS n FROM registrations WHERE activity_id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT')", (inventory["activity_id"],)).fetchone()["n"]
     waiting = conn.execute("SELECT * FROM registrations WHERE activity_id=%s AND status='WAITLISTED' ORDER BY created_at,id LIMIT %s FOR UPDATE", (inventory["activity_id"],max(0,inventory["capacity"]-count))).fetchall()
     for row in waiting:
-        updated = conn.execute("UPDATE registrations SET status=%s,expires_at=CASE WHEN price_cents>0 THEN clock_timestamp()+(%s * interval '1 second') END WHERE id=%s RETURNING *", ("PENDING_PAYMENT" if row["price_cents"] else "CONFIRMED",int(os.environ.get("RESERVATION_TTL_SECONDS","900")),row["id"])).fetchone()
+        updated = conn.execute("UPDATE registrations SET status=%s,expires_at=CASE WHEN price_cents>0 THEN clock_timestamp()+(%s * interval '1 second') END WHERE id=%s RETURNING *", ("PENDING_PAYMENT" if row["price_cents"] else "CONFIRMED",reservation_ttl(),row["id"])).fetchone()
         event_message(conn,updated,"registration.reserved" if row["price_cents"] else "registration.confirmed")
 
 @router.get("/availability/events/{id}")
@@ -156,7 +183,7 @@ class Reservation(BaseModel):
 
 @router.post("/registrations", status_code=201)
 def reserve(value: Reservation, authorization: str = Header(default=""), idempotency_key: str = Header(default="")):
-    user = actor(authorization)
+    user = participant(authorization)
     if not 8 <= len(idempotency_key) <= 100: raise HTTPException(400,"Informe Idempotency-Key de 8 a 100 caracteres.")
     event = remote("EVENTS", "/events/" + str(value.eventId))["event"]
     if event["status"] != "PUBLISHED" or datetime.fromisoformat(event["startsAt"].replace("Z","+00:00")) <= datetime.now(timezone.utc): raise HTTPException(409,"Inscrições encerradas.")
@@ -186,7 +213,7 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
             snapshot["priceOption"] = rate
         row = conn.execute("""INSERT INTO registrations(id,activity_id,user_id,request_key,status,price_cents,expires_at,snapshot)
           VALUES(%s,%s,%s,%s,%s,%s,CASE WHEN %s='PENDING_PAYMENT' THEN clock_timestamp()+(%s * interval '1 second') END,%s::jsonb) RETURNING *""",
-          (str(uuid4()),value.activityId,user["id"],idempotency_key,status,price,status,int(os.environ.get("RESERVATION_TTL_SECONDS","900")),json.dumps(snapshot))).fetchone()
+          (str(uuid4()),value.activityId,user["id"],idempotency_key,status,price,status,reservation_ttl(),json.dumps(snapshot))).fetchone()
         event_message(conn,row,"registration.confirmed" if status == "CONFIRMED" else "registration.reserved" if status == "PENDING_PAYMENT" else "registration.waitlisted")
     return {"registration":serialize(row)}
 
@@ -198,13 +225,13 @@ def owned(conn,id,user):
 
 @router.get("/registrations")
 def listing(authorization: str=Header(default="")):
-    user=actor(authorization)
+    user=participant(authorization)
     with db() as conn: rows=conn.execute("SELECT * FROM registrations WHERE user_id=%s ORDER BY created_at DESC",(user["id"],)).fetchall()
     return {"registrations":[serialize(row) for row in rows]}
 
 @router.get("/registrations/{id}")
 def detail(id:UUID,authorization: str=Header(default="")):
-    user=actor(authorization)
+    user=participant(authorization)
     with db() as conn:
         row=owned(conn,id,user["id"])
         bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
@@ -214,7 +241,7 @@ def detail(id:UUID,authorization: str=Header(default="")):
 
 @router.post("/registrations/{id}/cancel")
 def cancel(id:UUID,authorization: str=Header(default="")):
-    user=actor(authorization)
+    user=participant(authorization)
     with db() as conn:
         row=owned(conn,id,user["id"])
         bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
@@ -397,6 +424,14 @@ def payment(id:UUID,value:Decision,request:Request):
         bind_correlation(row["snapshot"].get("correlationId", str(row["id"])))
         event=remote("EVENTS","/events/"+row["snapshot"]["eventId"])["event"]
         inventory=lock(conn,row["activity_id"])
+        legacy_receipt = conn.execute("SELECT result FROM payment_notification_receipts WHERE registration_id=%s", (id,)).fetchone()
+        if legacy_receipt and legacy_receipt["result"] in ("APPROVED", "DECLINED") and legacy_receipt["result"] != value.outcome:
+            raise HTTPException(409, "Este pagamento já possui um resultado terminal diferente.")
+        decision = conn.execute("INSERT INTO payment_decisions(registration_id,outcome) VALUES(%s,%s) ON CONFLICT DO NOTHING RETURNING outcome", (id,value.outcome)).fetchone()
+        if decision is None:
+            decision = conn.execute("SELECT outcome FROM payment_decisions WHERE registration_id=%s", (id,)).fetchone()
+        if decision["outcome"] != value.outcome:
+            raise HTTPException(409, "Este pagamento já recebeu outro resultado.")
         maintain(conn,inventory,event)
         row=conn.execute("SELECT * FROM registrations WHERE id=%s FOR UPDATE",(id,)).fetchone()
         if row["status"] == "PENDING_PAYMENT":
@@ -469,14 +504,46 @@ def announcement(id: UUID, value: Announcement, request: Request):
                 "event": value.event.model_dump(), "changedFields": value.changedFields, "correlationId": value.correlationId or trace()["correlationId"], "requestId": trace()["requestId"]}), str(value.id)))
         return {"accepted": True, "duplicate": False, "queued": result.rowcount}
 
+def expire_cycle():
+    with db() as conn:
+        items = conn.execute("""SELECT DISTINCT i.activity_id FROM inventories i JOIN registrations r USING(activity_id)
+            WHERE r.status='PENDING_PAYMENT' AND r.expires_at<=clock_timestamp() ORDER BY i.activity_id""").fetchall()
+    for item in items:
+        try:
+            with db() as conn:
+                maintain(conn, lock(conn, item["activity_id"]))
+        except Exception as error:
+            print(json.dumps({"service":"registrations","worker":"expiry","activityId":str(item["activity_id"]),"error":type(error).__name__}), flush=True)
+
+
+def expiry_worker(stop):
+    # This independent loop never calls Event or the broker. Slow dependency
+    # retries in the publisher/promotion worker cannot delay reservation expiry.
+    while not stop.wait(3):
+        try:
+            expire_cycle()
+        except Exception as error:
+            print(json.dumps({"service":"registrations","worker":"expiry","error":type(error).__name__}), flush=True)
+
+
+def maintenance_cycle():
+    with db() as conn:
+        items = conn.execute("SELECT * FROM inventories ORDER BY activity_id").fetchall()
+    for item in items:
+        try:
+            event = remote("EVENTS", "/events/" + str(item["event_id"]))["event"]
+            with db() as conn:
+                maintain(conn, lock(conn, item["activity_id"]), event)
+        except Exception as error:
+            print(json.dumps({"service":"registrations","worker":"maintenance","activityId":str(item["activity_id"]),"error":type(error).__name__}), flush=True)
+
+
 def worker(stop):
     while not stop.wait(3):
         try:
-            with db() as conn: items=conn.execute("SELECT * FROM inventories").fetchall()
-            for item in items:
-                event=remote("EVENTS","/events/"+str(item["event_id"]))["event"]
-                with db() as conn: maintain(conn,lock(conn,item["activity_id"]),event)
-        except Exception as error: print(json.dumps({"service":"registrations","worker":"maintenance","error":type(error).__name__}),flush=True)
+            maintenance_cycle()
+        except Exception as error:
+            print(json.dumps({"service":"registrations","worker":"maintenance","error":type(error).__name__}),flush=True)
         try:
             import pika
             credentials=pika.PlainCredentials(os.environ["RABBITMQ_USER"],os.environ["RABBITMQ_PASSWORD"])

@@ -23,11 +23,14 @@ def db():
     return psycopg.connect(connect_timeout=3, row_factory=dict_row, options="-c statement_timeout=15000")
 
 
-def remote(service, path, authorization=""):
+def remote(service, path, authorization="", body=None):
     headers = {"authorization": authorization, "x-internal-key": os.environ["INTERNAL_API_KEY"], "accept": "application/json"}
     headers.update(trace_headers())
     try:
-        request = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers)
+        if body is not None:
+            headers["content-type"] = "application/json"
+        request = urllib.request.Request(os.environ[service + "_URL"] + path, headers=headers,
+                                         data=None if body is None else json.dumps(body).encode())
         with urllib.request.urlopen(request, timeout=5) as response:
             return json.load(response)
     except urllib.error.HTTPError as error:
@@ -151,26 +154,95 @@ def summarize(event, registrations, checked_at):
     counts = dict.fromkeys(STATUSES, 0)
     result = {item["id"]: {"activityId": item["id"], "title": item["title"], "capacity": item["capacity"],
               "total": 0, "byStatus": dict.fromkeys(STATUSES, 0), "attendanceCount": 0,
-              "confirmedAttendanceCount": 0, "simulatedRevenueCents": 0} for item in event["activities"]}
+              "confirmedAttendanceCount": 0, "simulatedRevenueCents": 0,
+              "paidRegistrationCount": 0, "freeRegistrationCount": 0} for item in event["activities"]}
     for item in registrations:
         status = effective_status(item, checked_at)
         current = result[item["activityId"]]
         counts[status] += 1
         current["byStatus"][status] += 1
         current["total"] += 1
+        current["paidRegistrationCount" if item["priceCents"] else "freeRegistrationCount"] += 1
         current["attendanceCount"] += int(item["attended"])
         current["confirmedAttendanceCount"] += int(item["attended"] and status == "CONFIRMED")
         if status == "CONFIRMED":
             current["simulatedRevenueCents"] += item["priceCents"]
+    for item in result.values():
+        item["reservedCount"] = item["byStatus"]["PENDING_PAYMENT"]
+        item["occupiedCount"] = item["reservedCount"] + item["byStatus"]["CONFIRMED"]
+        item["availableCount"] = max(0, item["capacity"] - item["occupiedCount"])
+        item["overCapacityCount"] = max(0, item["occupiedCount"] - item["capacity"])
+        item["occupancyPercent"] = round(100 * item["occupiedCount"] / item["capacity"], 2)
+    capacity = sum(item["capacity"] for item in result.values())
+    occupied = sum(item["occupiedCount"] for item in result.values())
     return {"eventId": event["id"], "eventTitle": event["title"], "eventStatus": event["status"],
             "registrationsByDay": [{"day": day, "count": count} for day, count in sorted(days.items())],
             "total": len(registrations), "byStatus": counts,
             "attendanceCount": sum(item["attendanceCount"] for item in result.values()),
             "confirmedAttendanceCount": sum(item["confirmedAttendanceCount"] for item in result.values()),
             "simulatedRevenueCents": sum(item["simulatedRevenueCents"] for item in result.values()),
+            "capacity": capacity, "occupiedCount": occupied,
+            "reservedCount": counts["PENDING_PAYMENT"],
+            "availableCount": sum(item["availableCount"] for item in result.values()),
+            "overCapacityCount": sum(item["overCapacityCount"] for item in result.values()),
+            "occupancyPercent": round(100 * occupied / capacity, 2) if capacity else 0,
+            "paidRegistrationCount": sum(item["paidRegistrationCount"] for item in result.values()),
+            "freeRegistrationCount": sum(item["freeRegistrationCount"] for item in result.values()),
             "paymentMode": "SIMULATED", "revenueBasis": "CONFIRMED_REGISTRATION_PRICES_NO_REAL_SETTLEMENT",
             "activities": list(result.values()), "checkedAt": checked_at,
             "consistency": "EVENTUAL_API_RECONCILIATION", "complete": True}
+
+
+PAYMENT_STATUSES = ("PENDING", "APPROVED", "DECLINED", "EXPIRED")
+
+
+def payment_indicators(report, registrations):
+    """Payment owns transaction state; unavailable data is never presented as zero."""
+    paid = {item["id"]: item for item in registrations if item["priceCents"] > 0}
+    metrics = {item["activityId"]: {"available": True, "byStatus": dict.fromkeys(PAYMENT_STATUSES, 0),
+               "providerByStatus": dict.fromkeys(PAYMENT_STATUSES[1:], 0),
+               "approvedAmountCents": 0, "transactionCount": 0, "withoutTransactionCount": 0}
+               for item in report["activities"]}
+    try:
+        ids, seen = list(paid), set()
+        for offset in range(0, len(ids), 500):
+            batch = ids[offset:offset + 500]
+            snapshot = remote("PAYMENTS", "/internal/payments/query", body={"registrationIds": batch})
+            payments = snapshot.get("payments") if isinstance(snapshot, dict) else None
+            if not isinstance(payments, list) or len(payments) > len(batch):
+                raise ValueError("Invalid payment snapshot")
+            for payment in payments:
+                identifier = payment["registrationId"]
+                if identifier not in batch or identifier in seen:
+                    raise ValueError("Unexpected or repeated payment")
+                seen.add(identifier)
+                registration = paid[identifier]
+                if (payment["status"] not in PAYMENT_STATUSES
+                        or type(payment["amountCents"]) is not int
+                        or payment["amountCents"] != registration["priceCents"]
+                        or payment.get("providerStatus") not in (None, *PAYMENT_STATUSES[1:])):
+                    raise ValueError("Inconsistent payment state")
+                metric = metrics[registration["activityId"]]
+                metric["transactionCount"] += 1
+                metric["byStatus"][payment["status"]] += 1
+                if payment.get("providerStatus"):
+                    metric["providerByStatus"][payment["providerStatus"]] += 1
+                if payment["status"] == "APPROVED":
+                    metric["approvedAmountCents"] += payment["amountCents"]
+        for identifier in paid.keys() - seen:
+            metrics[paid[identifier]["activityId"]]["withoutTransactionCount"] += 1
+    except (HTTPException, KeyError, TypeError, ValueError, OSError):
+        report["payments"] = {"available": False, "reason": "PAYMENT_SOURCE_UNAVAILABLE_OR_INCONSISTENT", "mode": "SIMULATED"}
+        for item in report["activities"]:
+            item["payments"] = dict(report["payments"])
+        return report
+    report["payments"] = {"available": True, "mode": "SIMULATED",
+        "byStatus": {status: sum(item["byStatus"][status] for item in metrics.values()) for status in PAYMENT_STATUSES},
+        "providerByStatus": {status: sum(item["providerByStatus"][status] for item in metrics.values()) for status in PAYMENT_STATUSES[1:]},
+        **{key: sum(item[key] for item in metrics.values()) for key in ("approvedAmountCents", "transactionCount", "withoutTransactionCount")}}
+    for item in report["activities"]:
+        item["payments"] = {**metrics[item["activityId"]], "mode": "SIMULATED"}
+    return report
 
 
 def report_for(event_id, authorization):
@@ -185,7 +257,7 @@ def report_for(event_id, authorization):
     registrations = [{"id": str(row["id"]), "activityId": str(row["activity_id"]), "status": row["status"], "createdAt": created_dates.get(str(row["id"])),
                       "priceCents": row["price_cents"], "attended": row["attended"],
                       "expiresAt": row["expires_at"].isoformat() if row["expires_at"] else None} for row in rows]
-    return summarize(snapshot, registrations, checked)
+    return payment_indicators(summarize(snapshot, registrations, checked), source_rows)
 
 
 @router.get("/reports/events/{event_id}")
@@ -206,12 +278,17 @@ def export(event_id: UUID, authorization: str = Header(default="")):
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(["event_id", "activity_id", "activity", "capacity", "total", *STATUSES,
-                     "attendance", "confirmed_attendance", "simulated_revenue_cents", "payment_mode", "checked_at"])
+                     "attendance", "confirmed_attendance", "simulated_revenue_cents", "payment_mode", "checked_at",
+                     "occupied", "available", "occupancy_percent", "payment_source_available",
+                     *["payment_" + status.lower() for status in PAYMENT_STATUSES], "approved_payment_cents"])
     for item in report["activities"]:
         writer.writerow([report["eventId"], item["activityId"], safe_csv(item["title"]), item["capacity"],
                          item["total"], *[item["byStatus"][status] for status in STATUSES],
                          item["attendanceCount"], item["confirmedAttendanceCount"], item["simulatedRevenueCents"],
-                         "SIMULATED", report["checkedAt"].isoformat()])
+                         "SIMULATED", report["checkedAt"].isoformat(), item["occupiedCount"], item["availableCount"],
+                         item["occupancyPercent"], item["payments"]["available"],
+                         *[item["payments"]["byStatus"][status] if item["payments"]["available"] else "" for status in PAYMENT_STATUSES],
+                         item["payments"].get("approvedAmountCents", "")])
     return Response("\ufeff" + output.getvalue(), media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": 'attachment; filename="relatorio-' + str(event_id) + '.csv"',
         "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})

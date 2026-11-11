@@ -5,10 +5,12 @@ export const tokenHash = token => createHash('sha256').update(token).digest('hex
 export function createSessions(pool) {
   return {
     async isValid(token, claims) {
-      const { rows } = await pool.query(`SELECT credentials_version AS version,
+      const { rows } = await pool.query(`SELECT credentials_version AS version, role,
+        (SELECT organization_id FROM organization_members WHERE user_id=users.id) AS "organizationId",
         EXISTS(SELECT 1 FROM revoked_sessions WHERE token_hash=$2 AND expires_at>now()) AS revoked
         FROM users WHERE id=$1`, [claims.sub, tokenHash(token)]);
-      return !!rows[0] && rows[0].version === (claims.sv ?? 0) && !rows[0].revoked;
+      return !!rows[0] && rows[0].version === (claims.sv ?? 0) && !rows[0].revoked
+        && rows[0].role === claims.role && (rows[0].organizationId ?? null) === (claims.organizationId ?? null);
     },
     async revoke(token, claims) {
       await pool.query(`INSERT INTO revoked_sessions(token_hash,user_id,expires_at) VALUES($1,$2,to_timestamp($3))

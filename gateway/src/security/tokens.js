@@ -8,7 +8,9 @@ export async function createVerifier(publicBase64) {
       algorithms: ['RS256'], issuer: 'eventhub-identity', audience: 'eventhub-api',
       requiredClaims: ['sub', 'exp', 'iat', 'role'], maxTokenAge: '1h',
     });
-    if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || payload.role !== 'PARTICIPANT') throw new Error('Invalid claims');
+    if (!/^[a-f0-9-]{36}$/i.test(payload.sub) || !['PARTICIPANT', 'ORGANIZER'].includes(payload.role)) throw new Error('Invalid claims');
+    if (payload.role === 'ORGANIZER' ? !/^[a-f0-9-]{36}$/i.test(payload.organizationId || '') : payload.organizationId != null)
+      throw new Error('Invalid institution claims');
     return payload;
   };
 }

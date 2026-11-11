@@ -1,5 +1,9 @@
 export type AccessArea = 'participant' | 'organization';
 
+export function accountDestination(role: 'PARTICIPANT' | 'ORGANIZER') {
+  return role === 'ORGANIZER' ? '/organizacao/eventos' : '/eventos';
+}
+
 export const accessAreas = {
   participant: {
     label: 'Participante',
@@ -27,6 +31,6 @@ export const accessAreas = {
     hero: 'Reúna sua equipe. Prepare grandes encontros.',
     heroDescription: 'Um espaço dedicado às organizações e às pessoas que tornam os eventos possíveis.',
     registerTitle: 'Cadastro do responsável',
-    registerDescription: 'Crie sua conta pessoal de responsável. Depois de entrar, cadastre a organização e adicione sua equipe.',
+    registerDescription: 'Crie sua conta de organizador vinculada a uma única instituição.',
   },
 };

@@ -54,7 +54,7 @@ export function createOrganizationService(repository) {
   }
   return {
     list: userId => repository.list(userId),
-    create: (userId, body) => repository.create(userId, data(body)),
+    create: () => { throw new UserError(409, 'institution_fixed', 'A instituição é definida no cadastro da conta de organizador e não pode ser alterada por esta operação.'); },
     get: (id, userId) => access(id, userId),
     async update(id, userId, body) {
       const values = data(body, true);
@@ -76,7 +76,9 @@ export function createOrganizationService(repository) {
         if (!member) throw new UserError(404, 'user_not_found', 'Usuário não encontrado. Cadastre a conta antes de adicioná-la.');
         return member;
       } catch (error) {
-        if (error.code === '23505') throw new UserError(409, 'already_member', 'Este usuário já faz parte da organização.');
+        if (error.code === '23505') throw new UserError(409, 'institution_fixed', 'O organizador já possui um vínculo institucional.');
+        if (error.code === 'PROFILE_REQUIRED') throw new UserError(409, 'organizer_required', 'A conta deve possuir exclusivamente o perfil de organizador. Esta operação não converte participantes.');
+        if (error.code === 'INSTITUTION_FIXED') throw new UserError(409, 'institution_fixed', 'O organizador já está vinculado a outra instituição.');
         throw error;
       }
     },
@@ -84,10 +86,7 @@ export function createOrganizationService(repository) {
       await access(id, userId, true);
       if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(memberId))
         throw new UserError(400, 'invalid_input', 'Identificador de membro inválido.');
-      const result = await repository.removeMember(id, userId, memberId);
-      if (result === 'FORBIDDEN') throw new UserError(403, 'forbidden', 'Apenas o responsável pode realizar esta operação.');
-      if (result === 'OWNER_PROTECTED') throw new UserError(409, 'owner_protected', 'O responsável pela organização não pode ser removido.');
-      if (result !== 'REMOVED') throw new UserError(404, 'member_not_found', 'Membro não encontrado nesta organização.');
+      throw new UserError(409, 'institution_fixed', 'Remover o único vínculo deixaria o organizador sem instituição. Transferências exigem um processo administrativo definido.');
     },
   };
 }

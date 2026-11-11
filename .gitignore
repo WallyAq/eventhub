@@ -24,4 +24,8 @@ tmp/rq08-*.log
 tmp/rq08-*.json
 tmp/organization-redesign-*.log
 tmp/participant-theme-*.log
+tmp/figma-audit/
+tmp/rules-qa/
+tmp/rules-*.json
+tmp/rules-backups/
 

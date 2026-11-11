@@ -51,7 +51,7 @@ def update(id: UUID, value: PublicInformation, authorization: str = Header(defau
         if not row:
             raise HTTPException(404, "Evento não encontrado.")
         event = row["payload"]
-        domain.organization(event["organizationId"], authorization)
+        domain.event_access(event, authorization)
         if event["status"] != "PUBLISHED":
             raise HTTPException(409, "Atualize as informações de um evento publicado. Rascunhos usam o editor completo.")
         if event["modality"] != "Online" and not value.location.strip():

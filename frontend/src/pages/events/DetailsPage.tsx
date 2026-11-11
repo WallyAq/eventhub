@@ -16,25 +16,25 @@ function duration(activity: Activity) {
   return hours ? `${hours}h${remaining ? ` ${remaining}min` : ''}` : `${remaining}min`;
 }
 
-export function EventDetailsPage() {
+export function EventDetailsPage({ preview = false }: { preview?: boolean }) {
   const { id } = useParams();
   const { hash } = useLocation();
-  const { data, error, loading } = useData<{ event: EventData }>('/events/' + id);
+  const { data, error, loading } = useData<{ event: EventData }>('/events/' + id + (preview ? '?managed=true' : ''));
   const event = data && data.event.id === id ? data.event : null;
   const availability = useEventAvailability(event?.id);
-  const registrations = useEventRegistrations(event?.id);
+  const registrations = useEventRegistrations(event?.id, !preview);
   const streamUrl = event?.streamUrl && /^https?:\/\//i.test(event.streamUrl) ? event.streamUrl : '';
   useEffect(() => {
     if (event && hash === '#atividades') document.getElementById('atividades')?.scrollIntoView({ block: 'start' });
   }, [event?.id, hash]);
-  return <BusinessLayout>
+  return <BusinessLayout area={preview ? 'organization' : 'participant'}>
     <div className="participant-details">
-      <Link className="participant-details__back" to="/eventos">← Explorar eventos</Link>
+      <Link className="participant-details__back" to={preview ? '/organizacao/eventos/' + id + '/gestao' : '/eventos'}>{preview ? '← Voltar à gestão' : '← Explorar eventos'}</Link>
       <Feedback loading={loading} error={error} />
       {event && <>
         <section className="business-card participant-details__heading" aria-labelledby="event-title">
           <h1 id="event-title">{event.title}</h1>
-          {event.activities.length > 0 && <Link className="primary-button" to={'/eventos/' + event.id + '/inscricao'}>Inscreva-se</Link>}
+          {!preview && event.activities.length > 0 && <Link className="primary-button" to={'/eventos/' + event.id + '/inscricao'}>Inscreva-se</Link>}
         </section>
 
         <section className="business-card participant-details__section" aria-labelledby="event-about-title">
@@ -66,7 +66,7 @@ export function EventDetailsPage() {
               <p><Icon file="e12a2" /><span>Instrutor(a): {activity.responsible || 'Não informado'}</span></p>
               <p className="participant-details__capacity"><ActivitySeats availability={availability.activities.get(activity.id)} loading={availability.loading} /></p>
             </div>
-            <div className="participant-details__activity-actions"><strong>{activity.priceCents ? money(activity.priceCents) : 'Gratuito'}</strong>{registrations.activities.has(activity.id) ? <ExistingRegistrationNotice registration={registrations.activities.get(activity.id)!} /> : registrations.loading ? <span role="status" className="participant-details__registration-loading">Consultando suas inscrições…</span> : <Link className="primary-button" to={'/atividades/' + event.id + '/' + activity.id + '/inscricao'}>Inscrever-se na atividade</Link>}</div>
+            <div className="participant-details__activity-actions"><strong>{activity.priceCents ? money(activity.priceCents) : 'Gratuito'}</strong>{!preview && (registrations.activities.has(activity.id) ? <ExistingRegistrationNotice registration={registrations.activities.get(activity.id)!} /> : registrations.loading ? <span role="status" className="participant-details__registration-loading">Consultando suas inscrições…</span> : <Link className="primary-button" to={'/atividades/' + event.id + '/' + activity.id + '/inscricao'}>Inscrever-se na atividade</Link>)}</div>
           </article>)}</div> : <p className="participant-details__empty">Nenhuma atividade disponível neste evento.</p>}
         </section>
 

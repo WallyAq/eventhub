@@ -4,6 +4,7 @@ import { AccessPage } from './pages/AccessPage';
 import { OrganizerDashboardPage, EventDashboardPage } from './pages/organization/DashboardPage';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { RequireAccount } from './auth/RequireAccount';
 import { ParticipantLoginPage } from './pages/participant/LoginPage';
 import { ParticipantRegisterPage } from './pages/participant/RegisterPage';
 import { OrganizationLoginPage } from './pages/organization/LoginPage';
@@ -29,28 +30,29 @@ export default function App() {
     <Route path="/organizacao/login" element={<OrganizationLoginPage />} />
     <Route path="/organizacao/cadastro" element={<OrganizationRegisterPage />} />
     <Route path="/login" element={<Navigate to="/acesso" replace />} />
-    <Route path="/cadastro" element={<Navigate to="/participante/cadastro" replace />} />
-    <Route path="/perfil" element={<ProfilePage />} />
-    <Route path="/organizacoes" element={<OrganizationsPage />} />
-    <Route path="/organizacao/perfil" element={<OrganizationProfilePage />} />
-    <Route path="/organizacao/perfil/:id" element={<OrganizationProfilePage />} />
+    <Route path="/cadastro" element={<AccessPage mode="register" />} />
+    <Route path="/perfil" element={<RequireAccount area="participant"><ProfilePage /></RequireAccount>} />
+    <Route path="/organizacoes" element={<RequireAccount area="organization"><OrganizationsPage /></RequireAccount>} />
+    <Route path="/organizacao/perfil" element={<RequireAccount area="organization"><OrganizationProfilePage /></RequireAccount>} />
+    <Route path="/organizacao/perfil/:id" element={<RequireAccount area="organization"><OrganizationProfilePage /></RequireAccount>} />
     <Route path="/diagnostico" element={<EnvironmentPage />} />
     <Route path="/recuperar-senha" element={<RecoveryPage />} />
     <Route path="/redefinir-senha" element={<RecoveryPage reset />} />
-    <Route path="/eventos" element={<CatalogPage />} />
-    <Route path="/eventos/:id" element={<EventDetailsPage />} />
-    <Route path="/eventos/:eventId/inscricao" element={<CheckoutPage />} />
-    <Route path="/organizacao/eventos" element={<ManageEventsPage />} />
-    <Route path="/organizacao/painel" element={<OrganizerDashboardPage />} />
-    <Route path="/organizacao/eventos/:id/painel" element={<EventDashboardPage />} />
-    <Route path="/organizacao/eventos/novo" element={<EventEditorPage key="new" />} />
-    <Route path="/organizacao/eventos/:id" element={<EventEditorPage />} />
-    <Route path="/organizacao/eventos/:id/gestao" element={<OrganizerEventPage />} />
-    <Route path="/atividades/:eventId/:activityId/inscricao" element={<CheckoutPage />} />
-    <Route path="/pagamento/:id" element={<CheckoutPage />} />
-    <Route path="/inscricoes/:id" element={<CheckoutPage />} />
-    <Route path="/minhas-inscricoes" element={<MyRegistrationsPage />} />
-    <Route path="*" element={<Navigate to="/participante/login" replace />} />
+    <Route path="/eventos" element={<RequireAccount area="participant"><CatalogPage /></RequireAccount>} />
+    <Route path="/eventos/:id" element={<RequireAccount area="participant"><EventDetailsPage /></RequireAccount>} />
+    <Route path="/eventos/:eventId/inscricao" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
+    <Route path="/organizacao/eventos" element={<RequireAccount area="organization"><ManageEventsPage /></RequireAccount>} />
+    <Route path="/organizacao/painel" element={<RequireAccount area="organization"><OrganizerDashboardPage /></RequireAccount>} />
+    <Route path="/organizacao/eventos/:id/painel" element={<RequireAccount area="organization"><EventDashboardPage /></RequireAccount>} />
+    <Route path="/organizacao/eventos/novo" element={<RequireAccount area="organization"><EventEditorPage key="new" /></RequireAccount>} />
+    <Route path="/organizacao/eventos/:id" element={<RequireAccount area="organization"><EventEditorPage /></RequireAccount>} />
+    <Route path="/organizacao/eventos/:id/visualizar" element={<RequireAccount area="organization"><EventDetailsPage preview /></RequireAccount>} />
+    <Route path="/organizacao/eventos/:id/gestao" element={<RequireAccount area="organization"><OrganizerEventPage /></RequireAccount>} />
+    <Route path="/atividades/:eventId/:activityId/inscricao" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
+    <Route path="/pagamento/:id" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
+    <Route path="/inscricoes/:id" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
+    <Route path="/minhas-inscricoes" element={<RequireAccount area="participant"><MyRegistrationsPage /></RequireAccount>} />
+    <Route path="*" element={<Navigate to="/acesso" replace />} />
   </Routes></AuthProvider></BrowserRouter>;
 }
 

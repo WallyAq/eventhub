@@ -5,11 +5,10 @@ import type { FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../AuthLayout';
 import { PasswordInput } from '../form/PasswordInput';
-import { ProfileSelector } from './ProfileSelector';
 import { TermsDialog } from './TermsDialog';
 import { useAuth } from '../../auth/AuthContext';
 import { errorMessage, registerParticipant } from '../../services/identity';
-import { accessAreas } from '../../auth/access';
+import { accessAreas, accountDestination } from '../../auth/access';
 import type { AccessArea } from '../../auth/access';
 
 export function AccountRegister({ area }: { area: AccessArea }) {
@@ -21,7 +20,7 @@ export function AccountRegister({ area }: { area: AccessArea }) {
   const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
   const [terms, setTerms] = useState(false), [representation, setRepresentation] = useState(false), [marketing, setMarketing] = useState(false);
   const [policy, setPolicy] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
-  if (session) return <Navigate to={access.destination} replace />;
+  if (session) return <Navigate to={accountDestination(session.user.role)} replace />;
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     if (password !== confirmation) { setError('As senhas devem ser iguais.'); return; }
@@ -37,7 +36,7 @@ export function AccountRegister({ area }: { area: AccessArea }) {
     finally { setBusy(false); }
   }
   return <AuthLayout area={area} variant="register"><section className="figma-card registration-card" aria-labelledby="register-title" data-figma-node={institution ? '32:2988' : '2:126'}>
-    <h1 id="register-title">Cadastre sua conta</h1><ProfileSelector area={area} />
+    <h1 id="register-title">Cadastre sua conta</h1>
     <form onSubmit={submit} aria-busy={busy}><fieldset disabled={busy}>
       {institution && <div className="form-field"><label htmlFor="register-cnpj">CNPJ da Instituição<RequiredMark /></label><MaskedInput mask="cnpj" id="register-cnpj" required placeholder="12.345.678/0001-90" value={cnpj} onValueChange={setCnpj} /></div>}
       <div className="form-field"><label htmlFor="register-name">{institution ? 'Razão Social' : 'Nome completo'}<RequiredMark /></label><input id="register-name" name="name" autoComplete={institution ? 'organization' : 'name'} required minLength={2} maxLength={120} placeholder={institution ? 'Fundação de Apoio à Gestão Científica e Pesquisa' : 'Ex: Mariana Costa Santos'} value={name} onChange={e => setName(e.target.value)} /></div>

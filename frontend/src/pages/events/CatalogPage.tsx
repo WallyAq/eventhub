@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BusinessLayout, Feedback, Icon } from '../../components/Business';
-import { useData, date, money } from '../../services/business';
+import { useData, money } from '../../services/business';
 import type { EventData } from '../../services/business';
 import './catalog.css';
 
@@ -32,16 +32,17 @@ function modalityLabel(value: string) { return value === 'Online' ? 'Remoto' : v
 function normalized(value: string) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim(); }
 
 export function EventCard({ event, managed = false }: { event: EventData; managed?: boolean }) {
+  const frequency = managed && event.status === 'PUBLISHED' && new Date(event.endsAt).getTime() > Date.now();
   return <article className={managed ? 'event-card managed-event' : 'event-card participant-event-card'}>
     <h3>{event.title}</h3><p className="event-description">{event.description}</p>
     <div className="event-meta">
       {!managed && <p><Icon file="a7cf1" />Instituição: {event.organizationName}</p>}
-      <p><Icon file="ed882" />{managed ? event.modality : modalityLabel(event.modality)} · {event.location || 'Plataforma online'}</p>
-      <p><Icon file="46b9b" />{managed ? date(event.startsAt) : eventDate(event)} · Carga horária: {event.hours}h</p>
+      <p>{managed ? <img src="/figma/official/ed882.svg" alt="" /> : <Icon file="ed882" />}{managed ? event.modality : modalityLabel(event.modality)} · {event.location || 'Plataforma online'}</p>
+      <p>{managed ? <img src="/figma/official/46b9b.svg" alt="" /> : <Icon file="46b9b" />}{eventDate(event)} · Carga horária: {event.hours}h</p>
     </div>
     {!managed && <p className="event-price">{eventPrice(event)}</p>}
     <div className="card-actions">{managed
-      ? <><Link className="secondary-button" to={'/organizacao/eventos/' + event.id + '/painel'}>Ver painel</Link><Link className="primary-button" to={'/organizacao/eventos/' + event.id + '/gestao'}>Gerenciar Evento</Link></>
+      ? <><Link className={frequency ? 'secondary-button' : 'primary-button'} to={'/organizacao/eventos/' + event.id + '/gestao'}>Gerenciar Evento</Link>{frequency && <Link className="primary-button" to={'/organizacao/eventos/' + event.id + '/gestao?aba=atividades'}>Abrir Frequência</Link>}</>
       : <><Link className="primary-button" to={'/eventos/' + event.id + '/inscricao'}>Inscreva-se</Link><Link className="secondary-button" to={'/eventos/' + event.id}>Detalhes do Evento</Link></>}
     </div>
   </article>;
@@ -49,7 +50,7 @@ export function EventCard({ event, managed = false }: { event: EventData; manage
 
 export function EventFilters({ query, setQuery, modality, setModality, managed = false, children }: { query: string; setQuery: (value: string) => void; modality: string; setModality: (value: string) => void; managed?: boolean; children?: ReactNode }) {
   const modalities = managed ? ['Presencial', 'Híbrido', 'Online'] : ['Presencial', 'Online', 'Híbrido'];
-  return <><div className="search-field"><Icon file={managed ? 'b6a5d' : '3f6b7'} /><input aria-label="Buscar eventos" placeholder={managed ? 'Buscar por nome do evento...' : 'Nome do evento ou instituição...'} value={query} onChange={event => setQuery(event.target.value)} /></div>{children}<select aria-label="Modalidade" value={modality} onChange={event => setModality(event.target.value)}><option value="">Modalidade</option>{modalities.map(value => <option key={value} value={value}>{managed ? value : modalityLabel(value)}</option>)}</select></>;
+  return <><div className="search-field">{managed ? <img src="/figma/official/b6a5d.svg" alt="" /> : <Icon file="3f6b7" />}<input aria-label="Buscar eventos" placeholder={managed ? 'Buscar por nome do evento...' : 'Nome do evento ou instituição...'} value={query} onChange={event => setQuery(event.target.value)} /></div>{children}<select aria-label="Modalidade" value={modality} onChange={event => setModality(event.target.value)}><option value="">Modalidade</option>{modalities.map(value => <option key={value} value={value}>{managed ? value : modalityLabel(value)}</option>)}</select></>;
 }
 
 function pageNumbers(current: number, pages: number) {

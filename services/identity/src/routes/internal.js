@@ -23,7 +23,7 @@ export function createInternalRouter(service, tokens, internalKey = process.env.
       return res.status(404).json({ error: 'not_found', requestId: req.requestId });
     try {
       const user = await service.profile(req.params.id);
-      res.json({ user: { id: user.id, name: user.name, email: user.email } });
+      res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organizationId } });
     } catch (error) {
       if (error.code === 'invalid_token') return res.status(404).json({ error: 'not_found', requestId: req.requestId });
       throw error;

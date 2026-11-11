@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { chromium } from '../frontend/node_modules/playwright/index.mjs';
+const origin = 'http://127.0.0.1:18080';
+const fixtures = JSON.parse(await readFile(new URL('./rules-qa/browser-fixtures.json', import.meta.url), 'utf8'));
+const directory = new URL('../output/visual-audit/2026-11-10/live/', import.meta.url);
+const verification = JSON.parse(await readFile(new URL('verification.json', directory), 'utf8'));
+const browser = await chromium.launch({ headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  page.setDefaultTimeout(60000);
+  await page.goto(origin + '/organizacao/login');
+  await page.locator('#login-email').fill(fixtures.organizer.email);
+  await page.locator('#login-password').fill(fixtures.password);
+  const response = page.waitForResponse(response => response.url() === origin + '/api/auth/login');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  assert.equal((await response).status(), 200);
+  await page.waitForURL(origin + '/organizacao/eventos');
+  await page.locator(`a[href="/organizacao/eventos/${verification.eventId}/gestao"]`).first().waitFor();
+  await page.screenshot({ path: fileURLToPath(new URL('organizer-events-mobile.png', directory)), fullPage: true });
+  const metrics = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, brokenImages: [...document.images].filter(image => !image.complete || image.naturalWidth === 0).map(image => image.getAttribute('src')) }));
+  assert.equal(metrics.width, metrics.scrollWidth);
+  assert.deepEqual(metrics.brokenImages, []);
+  verification.screenshots = verification.screenshots.map(item => item.name === 'organizer-events-mobile' ? { name: item.name, ...metrics } : item);
+  verification.visualReview = ['Organizer dashboard desktop', 'Participant catalog mobile', 'Registrations mobile', 'Paid confirmation desktop', 'Organizer event management mobile after populated data'];
+  await writeFile(new URL('verification.json', directory), JSON.stringify(verification, null, 2));
+  console.log(JSON.stringify({ success: true, recaptured: 'organizer-events-mobile', ...metrics }));
+} finally { await browser.close(); }

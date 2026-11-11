@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-const publicColumns = 'id, name, email, email_verified_at AS "emailVerifiedAt", role, cpf, phone, marketing_opt_in AS "marketingOptIn", created_at AS "createdAt", updated_at AS "updatedAt"';
+const publicColumns = `id, name, email, email_verified_at AS "emailVerifiedAt", role,
+  (SELECT organization_id FROM organization_members WHERE user_id=users.id) AS "organizationId",
+  cpf, phone, marketing_opt_in AS "marketingOptIn", created_at AS "createdAt", updated_at AS "updatedAt"`;
 
 export function createUserRepository(pool) {
   return {
@@ -9,14 +11,15 @@ export function createUserRepository(pool) {
       try {
         await client.query('BEGIN');
         const { rows } = await client.query(
-          `INSERT INTO users (id,name,email,password_hash,cpf,phone,marketing_opt_in,terms_accepted_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${publicColumns}`,
-          [randomUUID(),name,email,passwordHash,cpf,phone,marketingOptIn,termsAccepted ? new Date() : null],
+          `INSERT INTO users (id,name,email,password_hash,cpf,phone,marketing_opt_in,terms_accepted_at,role) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${publicColumns}`,
+          [randomUUID(),name,email,passwordHash,cpf,phone,marketingOptIn,termsAccepted ? new Date() : null,organization ? 'ORGANIZER' : 'PARTICIPANT'],
         );
         if (organization) {
           const id = randomUUID();
           await client.query('INSERT INTO organizations (id,name,description,cnpj,legal_name,entity_type,phone,email) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
             [id,organization.name,'',organization.cnpj,organization.legalName,organization.entityType,organization.phone,organization.email]);
           await client.query("INSERT INTO organization_members (organization_id,user_id,role) VALUES ($1,$2,'OWNER')", [id,rows[0].id]);
+          rows[0].organizationId = id;
         }
         await client.query('COMMIT');
         return rows[0];

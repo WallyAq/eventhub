@@ -2,19 +2,20 @@ import { MaskedInput, formatInput } from '../../components/form/MaskedInput';
 import { RequiredMark } from '../../components/form/RequiredMark';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { PasswordSection } from '../../components/profile/PasswordSection';
 import { useAuth } from '../../auth/AuthContext';
 import { ApiError, errorMessage } from '../../services/identity';
-import { getOrganization, listOrganizations, updateOrganization } from '../../services/organizations';
+import { getOrganization, updateOrganization } from '../../services/organizations';
 import type { Organization } from '../../types/organizations';
 import './organization-profile.css';
 
 export function OrganizationProfilePage() {
-  const { session, signOut } = useAuth(), { id } = useParams(), navigate = useNavigate();
+  const { session, signOut } = useAuth(), { id } = useParams();
   const token = session?.token;
-  const [organizations, setOrganizations] = useState<Organization[]>([]), [organization, setOrganization] = useState<Organization | null>(null);
+  const institutionId = session?.user.organizationId;
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [legalName, setLegalName] = useState(''), [name, setName] = useState(''), [cnpj, setCnpj] = useState(''), [phone, setPhone] = useState(''), [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState('');
   const [editing, setEditing] = useState(false), [passwordOpen, setPasswordOpen] = useState(false);
@@ -23,15 +24,14 @@ export function OrganizationProfilePage() {
     const controller = new AbortController();
     setLoading(true); setError(''); setOrganization(null); setSuccess(''); setEditing(false); setPasswordOpen(false);
     (async () => {
-      const items = await listOrganizations(token, controller.signal);
-      const current = id ? await getOrganization(token, id, controller.signal) : items[0];
+      if (!institutionId || (id && id !== institutionId)) throw new Error('Instituição fora do vínculo autorizado da sua conta.');
+      const current = await getOrganization(token, institutionId, controller.signal);
       if (controller.signal.aborted) return;
-      setOrganizations(items);
       if (current) { setOrganization(current); setLegalName(current.legalName || current.name); setName(current.name); setCnpj(current.cnpj || ''); setPhone(current.phone || ''); setEmail(current.email || ''); }
     })().catch(error => { if (controller.signal.aborted) return; if (error instanceof ApiError && error.status === 401) signOut('Sua sessão terminou. Entre novamente.'); else setError(errorMessage(error)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [id, token, signOut]);
+  }, [id, institutionId, token, signOut]);
   if (!session) return <Navigate to="/organizacao/login" replace />;
   const owner = organization?.membershipRole === 'OWNER';
   function restoreFields(current: Organization) {
@@ -50,17 +50,16 @@ export function OrganizationProfilePage() {
     setBusy(true); setError(''); setSuccess('');
     try {
       const updated = await updateOrganization(token, organization.id, name, organization.description, { legalName, ...(cnpj ? { cnpj } : {}), phone, email });
-      setOrganization(updated); restoreFields(updated); setOrganizations(items => items.map(item => item.id === updated.id ? updated : item)); setEditing(false); setSuccess('Dados da instituição atualizados.');
+      setOrganization(updated); restoreFields(updated); setEditing(false); setSuccess('Dados da instituição atualizados.');
     }
     catch (error) { if (error instanceof ApiError && error.status === 401) signOut('Sua sessão terminou. Entre novamente.'); else setError(errorMessage(error)); }
     finally { setBusy(false); }
   }
   return <AppLayout area="organization"><main className="profile-main organization-profile" data-figma-node={editing ? '2052:1962' : '2053:2098'}>
     <div className="page-heading"><h1>Meu Perfil</h1><p>Gerencie suas informações básicas de identificação e segurança de acesso institucional.</p></div>
-    {organizations.length > 1 && <div className="form-field organization-picker"><label htmlFor="profile-organization">Organização</label><select id="profile-organization" disabled={busy} value={organization?.id || ''} onChange={e => navigate('/organizacao/perfil/' + e.target.value)}>{organizations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>}
     {loading && <p className="info" role="status">Carregando organização…</p>}
     {error && <p className="error" role="alert">{error}</p>}
-    {!loading && !organization && !error && <div className="profile-card"><p>Você ainda não faz parte de uma organização.</p><Link to="/organizacoes">Criar organização ou consultar sua equipe</Link></div>}
+    {!loading && !organization && !error && <div className="profile-card"><p>Seu vínculo institucional não foi identificado.</p><Link to="/organizacoes">Consultar instituição e equipe</Link></div>}
     {organization && <div className="profile-card organization-profile__card">
       <section aria-labelledby="institution-account-heading">
         <div className="organization-profile__section-header"><h2 id="institution-account-heading" className="section-heading"><img src="/figma/98116.svg" alt="" />Dados da Conta</h2>

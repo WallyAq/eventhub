@@ -3,6 +3,7 @@ import { getPlatformStatus } from '../services/api';
 import type { PlatformStatus } from '../types/status';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { useAuth } from '../auth/AuthContext';
 
 const labels: Record<string, string> = {
   identity: 'Identidade e acesso', events: 'Eventos e programação',
@@ -12,6 +13,7 @@ const labels: Record<string, string> = {
 };
 
 export function EnvironmentPage() {
+  const { session } = useAuth();
   const [data, setData] = useState<PlatformStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +27,7 @@ export function EnvironmentPage() {
   useEffect(() => { void refresh(); }, []);
   return (
     <div className="shell">
-      <header><Brand /><nav className="account-nav"><Link to="/perfil">Minha conta</Link><span className="environment">Ambiente local · UECE</span></nav></header>
+      <header><Brand /><nav className="account-nav"><Link to={session ? session.user.role === 'ORGANIZER' ? '/organizacao/perfil' : '/perfil' : '/acesso'}>Minha conta</Link><span className="environment">Ambiente local · UECE</span></nav></header>
       <main>
         <section className="intro">
           <span className="eyebrow">CONEXÕES QUE MOVEM O CONHECIMENTO</span>

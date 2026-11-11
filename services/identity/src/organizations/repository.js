@@ -20,10 +20,10 @@ export function createOrganizationRepository(pool) {
       finally { client.release(); }
     },
     async list(userId) {
-      return (await pool.query(`SELECT ${columns} FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=$1 ORDER BY o.created_at,o.id`, [userId])).rows;
+      return (await pool.query(`SELECT ${columns} FROM organizations o JOIN organization_members m ON m.organization_id=o.id JOIN users u ON u.id=m.user_id WHERE m.user_id=$1 AND u.role='ORGANIZER' ORDER BY o.created_at,o.id`, [userId])).rows;
     },
     async findForUser(id, userId) {
-      return (await pool.query(`SELECT ${columns} FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE o.id=$1 AND m.user_id=$2`, [id, userId])).rows[0];
+      return (await pool.query(`SELECT ${columns} FROM organizations o JOIN organization_members m ON m.organization_id=o.id JOIN users u ON u.id=m.user_id WHERE o.id=$1 AND m.user_id=$2 AND u.role='ORGANIZER'`, [id, userId])).rows[0];
     },
     async update(id, userId, { name, description, cnpj, legalName, entityType, phone, email }) {
       return (await pool.query(`UPDATE organizations o SET name=COALESCE($3,o.name),description=COALESCE($4,o.description),
@@ -37,11 +37,18 @@ export function createOrganizationRepository(pool) {
         ORDER BY m.created_at,u.id`, [id, userId])).rows;
     },
     async addMember(id, userId, email) {
-      const { rows } = await pool.query(`INSERT INTO organization_members (organization_id,user_id,role)
-        SELECT $1,u.id,'ORGANIZER' FROM users u WHERE u.email=$3
-        AND EXISTS(SELECT 1 FROM organization_members actor WHERE actor.organization_id=$1 AND actor.user_id=$2 AND actor.role='OWNER')
-        RETURNING user_id AS id,role,created_at AS "createdAt"`, [id, userId, email]);
-      return rows[0];
+      // Membership is immutable through public APIs. Repeating an existing link
+      // is harmless; a participant or a second institution is never accepted.
+      const { rows } = await pool.query(`SELECT u.id,u.role AS "accountRole",m.organization_id AS "organizationId",m.role,m.created_at AS "createdAt"
+        FROM users u LEFT JOIN organization_members m ON m.user_id=u.id WHERE u.email=$3
+        AND EXISTS(SELECT 1 FROM organization_members actor JOIN users a ON a.id=actor.user_id
+          WHERE actor.organization_id=$1 AND actor.user_id=$2 AND actor.role='OWNER' AND a.role='ORGANIZER')`, [id, userId, email]);
+      const member = rows[0];
+      if (!member) return undefined;
+      if (member.accountRole !== 'ORGANIZER') throw Object.assign(new Error('Organizer account required'), { code: 'PROFILE_REQUIRED' });
+      if (member.organizationId !== id) throw Object.assign(new Error('Institution is fixed'), { code: 'INSTITUTION_FIXED' });
+      const { accountRole, organizationId, ...result } = member;
+      return result;
     },
     async removeMember(id, actorId, memberId) {
       const client = await pool.connect();

@@ -1,15 +1,22 @@
-.login-choice-page{min-height:100dvh;padding:48px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;background:#f7f9fd;--primary:#24658e;--primary-text:#1b5277;--border:#c9d5e2;--muted:#687a8e}
-.login-choice-page .brand-logo{filter:hue-rotate(-35deg)}
-.login-choice{width:100%;max-width:760px;text-align:center}
-.login-choice>header{margin-bottom:28px}
-.login-choice h1{font-size:28px;line-height:36px;margin-bottom:8px}
-.login-choice>header p{font-size:14px;color:var(--muted);margin:0}
-.login-choice__options{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.login-choice__options>article{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:28px;background:white;border:1px solid var(--border);border-radius:8px}
-.login-choice__options h2{font-size:20px;margin-bottom:12px}
-.login-choice__options p{font-size:14px;color:#464555;margin-bottom:24px}
-.login-choice__options .primary-button{width:100%;margin-top:auto;box-shadow:0 1px 2px #24658e33}
+.login-choice-page{min-height:100dvh;padding:32px;display:flex;align-items:center;justify-content:center;background:#f7f9fd;--primary:#226192;--primary-text:#226192}
+.login-choice{width:100%;max-width:1276px;min-height:700px;display:flex;flex-direction:column;align-items:center}
+.login-choice>header{text-align:center;padding-top:5.5px;margin-bottom:48px}
+.login-choice>header h1{font-size:48px;line-height:48px;letter-spacing:-1.2px;font-weight:700;color:#0f172a;margin:12px 0}
+.login-choice>header>p:last-child{font-size:16px;line-height:24px;color:#64748b;margin:0}
+.login-choice .login-choice__eyebrow{font-size:12px;line-height:16px;letter-spacing:2.4px;font-weight:700;color:#226192;margin:0}
+.login-choice__options{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,502px));justify-content:center;gap:24px}
+.login-choice__options>article{min-height:363px;display:flex;flex-direction:column;align-items:flex-start;padding:40px;background:white;border:1px solid #f1f5f9;border-radius:16px;box-shadow:0 1px 2px #0000000d}
+.login-choice__options>article:last-child{background:#fffffff2}
+.login-choice__number{font-size:14px;line-height:20px;font-weight:600;color:#226192}
+.login-choice__role{font-size:11px;line-height:16.5px;letter-spacing:1.1px;font-weight:700;color:#226192;margin:24px 0 8px}
+.login-choice__options h2{font-size:28px;line-height:32px;letter-spacing:-.7px;font-weight:600;color:#0f172a;margin:0}
+.login-choice__description{font-size:14px;line-height:20px;color:#64748b;margin:16px 0 0;min-height:40px}
+.login-choice__options .primary-button{width:100%;gap:8px;margin-top:40px;padding:14px 24px;border:0;border-radius:8px;font-size:14px;line-height:20px;font-weight:500;box-shadow:none;background:#226192;color:white}
 .login-choice__options .primary-button:hover{background:#194f73}
-.login-choice__back{display:inline-block;margin-top:28px;font-size:13px}
+.login-choice__options .primary-button img{display:block;flex-shrink:0}
+.login-choice__register{align-self:center;font-size:14px;line-height:20px;font-weight:500;color:#226192;margin-top:16px;text-decoration:none}
+.login-choice__note{max-width:576px;margin:56px 0 0;color:#64748be6;font-size:12px;line-height:16px;text-align:center}
+.login-choice__back{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+.login-choice__back:focus{position:static;width:auto;height:auto;clip-path:none;margin-top:24px;font-size:13px}
 .login-choice-page :focus-visible{outline-color:#90bdd8}
-@media(max-width:600px){.login-choice-page{padding:32px 16px;gap:24px}.login-choice h1{font-size:24px;line-height:32px}.login-choice__options{grid-template-columns:1fr;gap:16px}.login-choice__options>article{padding:24px}.login-choice__options p{margin-bottom:20px}}
+@media(max-width:750px){.login-choice-page{padding:40px 16px}.login-choice{min-height:0}.login-choice>header{margin-bottom:32px}.login-choice>header h1{font-size:32px;line-height:38px;letter-spacing:-.8px}.login-choice__options{grid-template-columns:minmax(0,502px);gap:20px}.login-choice__options>article{padding:28px;min-height:0}.login-choice__options h2{font-size:26px}.login-choice__options .primary-button{padding:14px 12px;font-size:13px;margin-top:28px}.login-choice__note{margin-top:32px}}

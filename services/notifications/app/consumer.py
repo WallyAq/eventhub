@@ -70,7 +70,10 @@ def consume(stop, delivery):
                     channel.basic_ack(method.delivery_tag)
                 except Exception:
                     tries=retry_attempt(properties.headers)
-                    channel.basic_publish(exchange="",routing_key="notifications.failed" if tries>=3 else "notifications",body=body,properties=pika.BasicProperties(delivery_mode=2,message_id=properties.message_id,correlation_id=properties.correlation_id,headers={**(properties.headers or {}),"attempt":tries}))
+                    # Publisher confirmation alone permits an unroutable message
+                    # to be discarded. mandatory returns it before acknowledging
+                    # the original, preserving recovery when the retry/DLQ vanishes.
+                    channel.basic_publish(exchange="",routing_key="notifications.failed" if tries>=3 else "notifications",body=body,properties=pika.BasicProperties(delivery_mode=2,message_id=properties.message_id,correlation_id=properties.correlation_id,headers={**(properties.headers or {}),"attempt":tries}),mandatory=True)
                     channel.basic_ack(method.delivery_tag)
                     stop.wait(1)
             channel.cancel()

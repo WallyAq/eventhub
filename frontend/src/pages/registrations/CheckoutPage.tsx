@@ -163,7 +163,7 @@ export function CheckoutPage() {
   function displayReservation(value: Registration) {
     currentStatus.current = value.status;
     setRegistration(value); setStep(value.status === 'PENDING_PAYMENT' ? 3 : 4);
-    navigate('/pagamento/' + value.id, { replace: true });
+    navigate((value.status === 'PENDING_PAYMENT' ? '/pagamento/' : '/inscricoes/') + value.id, { replace: true });
   }
   function displayExisting(value: Registration) {
     setAlreadyRegisteredId(value.id);

@@ -11,7 +11,9 @@ function parseUser(value: unknown): User {
   const user = record(value);
   for (const key of ['cpf','phone']) if (user[key] != null && typeof user[key] !== 'string') throw new Error('Resposta inválida do serviço.');
   if (typeof user.id !== 'string' || typeof user.name !== 'string' || typeof user.email !== 'string'
-      || user.role !== 'PARTICIPANT' || typeof user.createdAt !== 'string' || typeof user.updatedAt !== 'string')
+      || !['PARTICIPANT', 'ORGANIZER'].includes(String(user.role))
+      || (user.role === 'PARTICIPANT' ? user.organizationId !== null : typeof user.organizationId !== 'string' || !user.organizationId)
+      || typeof user.createdAt !== 'string' || typeof user.updatedAt !== 'string')
     throw new Error('Resposta inválida do serviço.');
   return user as User;
 }
@@ -55,6 +57,8 @@ export async function logoutSession(token: string) {
     throw new ApiError(response.status, 'Não foi possível revogar a sessão no servidor.');
 }
 export function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.name === 'TimeoutError') return 'A conexão demorou mais que o esperado. Tente novamente.';
+  if (error instanceof Error && error.name === 'AbortError') return 'A conexão foi interrompida. Tente novamente.';
   return error instanceof Error && !(error instanceof TypeError) ? error.message : 'Não foi possível conectar ao serviço. Tente novamente.';
 }
 export { request as identityRequest };

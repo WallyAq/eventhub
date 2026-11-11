@@ -3,6 +3,8 @@ import json
 import os
 import re
 import secrets
+import hashlib
+from pathlib import Path
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -34,7 +36,17 @@ def actor(authorization):
     return remote(os.environ["IDENTITY_URL"] + "/users/me", authorization)["user"]
 
 def organization(id, authorization):
+    user = actor(authorization)
+    if user.get("role") != "ORGANIZER" or user.get("organizationId") != str(id):
+        raise HTTPException(403, "A conta não administra esta instituição.")
     return remote(os.environ["IDENTITY_URL"] + "/organizations/" + str(UUID(str(id))), authorization)["organization"]
+
+
+def event_access(event, authorization):
+    user = actor(authorization)
+    if user.get("role") != "ORGANIZER" or user.get("organizationId") != event["organizationId"] or user["id"] != event.get("ownerUserId"):
+        raise HTTPException(403, "O evento não está sob sua responsabilidade.")
+    return organization(event["organizationId"], authorization)
 
 class PriceOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -154,6 +166,17 @@ def migrate():
     with db() as conn:
         conn.execute("SELECT pg_advisory_xact_lock(42001)")
         conn.execute("CREATE TABLE IF NOT EXISTS events (id uuid PRIMARY KEY, organization_id uuid NOT NULL, status text NOT NULL CHECK(status IN ('DRAFT','PUBLISHED','CANCELLED')), payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now())")
+        conn.execute("CREATE TABLE IF NOT EXISTS event_schema_migrations (name text PRIMARY KEY,checksum text NOT NULL,applied_at timestamptz NOT NULL DEFAULT now())")
+        for path in sorted((Path(__file__).parent / "migrations").glob("*.sql")):
+            sql = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+            checksum = hashlib.sha256(sql.encode()).hexdigest()
+            applied = conn.execute("SELECT checksum FROM event_schema_migrations WHERE name=%s", (path.name,)).fetchone()
+            if applied:
+                if applied["checksum"] != checksum:
+                    raise RuntimeError("Applied event migration was modified: " + path.name)
+                continue
+            conn.execute(sql)
+            conn.execute("INSERT INTO event_schema_migrations(name,checksum) VALUES(%s,%s)", (path.name,checksum))
 
 def get_event(id):
     with db() as conn:
@@ -180,7 +203,7 @@ def certificate_events(request: Request, offset: int = 0):
 
 def public_event(event):
     """Contact email is available only in explicitly authorized managed views."""
-    return {**event, "speakers": [
+    return {**{key: value for key, value in event.items() if key != "ownerUserId"}, "speakers": [
         {key: value for key, value in speaker.items() if key != "email"}
         for speaker in event.get("speakers", [])
     ]}
@@ -189,9 +212,11 @@ def public_event(event):
 def listing(managed: bool = False, authorization: str = Header(default="")):
     with db() as conn:
         if managed:
-            orgs = remote(os.environ["IDENTITY_URL"] + "/organizations", authorization)["organizations"]
-            ids = [str(item["id"]) for item in orgs]
-            rows = conn.execute("SELECT payload FROM events WHERE organization_id::text=ANY(%s) ORDER BY created_at DESC", (ids,)).fetchall()
+            user = actor(authorization)
+            if user.get("role") != "ORGANIZER" or not user.get("organizationId"):
+                raise HTTPException(403, "Esta consulta exige uma conta de organizador.")
+            organization(user["organizationId"], authorization)
+            rows = conn.execute("SELECT payload FROM events WHERE organization_id=%s AND owner_user_id=%s ORDER BY created_at DESC", (user["organizationId"],user["id"])).fetchall()
         else:
             rows = conn.execute("SELECT payload FROM events WHERE status='PUBLISHED' ORDER BY created_at DESC").fetchall()
     return {"events": [row["payload"] if managed else public_event(row["payload"]) for row in rows]}
@@ -200,24 +225,25 @@ def listing(managed: bool = False, authorization: str = Header(default="")):
 def detail(id: UUID, request: Request, authorization: str = Header(default=""), managed: bool = False):
     event = get_event(id)
     if managed or (event["status"] != "PUBLISHED" and not internal(request)):
-        organization(event["organizationId"], authorization)
+        event_access(event, authorization)
     return {"event": event if managed else public_event(event)}
 
 def save(value, authorization, id=None):
     org = organization(value.organizationId, authorization)
+    user = actor(authorization)
     payload = value.model_dump(mode="json")
-    payload.update(id=str(id or uuid4()), status="DRAFT", organizationName=org["name"])
+    payload.update(id=str(id or uuid4()), status="DRAFT", organizationName=org["name"], ownerUserId=user["id"])
     for item in payload["activities"]: item["id"] = str(uuid4())
     with db() as conn:
         if id:
             current = conn.execute("SELECT payload FROM events WHERE id=%s FOR UPDATE", (id,)).fetchone()
             if not current: raise HTTPException(404, "Evento não encontrado.")
-            organization(current["payload"]["organizationId"], authorization)
+            event_access(current["payload"], authorization)
             if current["payload"]["status"] != "DRAFT": raise HTTPException(409, "Somente rascunhos podem ser editados. Capacidade e preço publicados são fixos.")
             if current["payload"]["organizationId"] != str(value.organizationId): raise HTTPException(400, "Não é possível transferir a organização.")
             conn.execute("UPDATE events SET payload=%s::jsonb WHERE id=%s", (json.dumps(payload), id))
         else:
-            conn.execute("INSERT INTO events(id,organization_id,status,payload) VALUES (%s,%s,'DRAFT',%s::jsonb)", (payload["id"],value.organizationId,json.dumps(payload)))
+            conn.execute("INSERT INTO events(id,organization_id,owner_user_id,status,payload) VALUES (%s,%s,%s,'DRAFT',%s::jsonb)", (payload["id"],value.organizationId,user["id"],json.dumps(payload)))
     return {"event": payload}
 
 @router.post("/events", status_code=201)
@@ -234,7 +260,7 @@ def transition(id: UUID, action: Literal["publish", "cancel"], authorization: st
         row = conn.execute("SELECT payload FROM events WHERE id=%s FOR UPDATE", (id,)).fetchone()
         if not row: raise HTTPException(404, "Evento não encontrado.")
         event = row["payload"]
-        organization(event["organizationId"], authorization)
+        event_access(event, authorization)
         was_published = event["status"] == "PUBLISHED"
         if action == "publish":
             if event["status"] == "CANCELLED": raise HTTPException(409, "Evento cancelado não pode ser publicado.")

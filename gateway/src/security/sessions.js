@@ -10,7 +10,8 @@ export function createSessionVerifier(verifyToken, identityUrl, internalKey, req
       if (response.status === 401) throw Object.assign(new Error('Invalid session'), { status: 401 });
       if (!response.ok) throw new Error('Identity unavailable');
       const data = await response.json();
-      if (data.identity?.sub !== claims.sub || data.identity?.role !== claims.role)
+      if (data.identity?.sub !== claims.sub || data.identity?.role !== claims.role
+          || (data.identity?.organizationId ?? null) !== (claims.organizationId ?? null))
         throw new Error('Invalid identity response');
       return claims;
     } catch (error) {
