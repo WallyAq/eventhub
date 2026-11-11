@@ -1,4 +1,5 @@
 import type { LoginResult, User } from '../types/auth';
+import type { AccessArea } from '../auth/access';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -32,8 +33,8 @@ async function request(path: string, method: string, body?: unknown, token?: str
 export async function registerParticipant(name: string, email: string, password: string, details: Record<string, unknown> = {}) {
   return parseUser((await request('/auth/register', 'POST', { name, email, password, ...details })).user);
 }
-export async function login(email: string, password: string): Promise<LoginResult> {
-  const data = await request('/auth/login', 'POST', { email, password });
+export async function login(email: string, password: string, area: AccessArea): Promise<LoginResult> {
+  const data = await request('/auth/login', 'POST', { email, password, area });
   if (typeof data.accessToken !== 'string' || data.tokenType !== 'Bearer'
       || typeof data.expiresIn !== 'number' || data.expiresIn <= 0 || !Number.isFinite(data.expiresIn))
     throw new Error('Resposta inválida do serviço.');

@@ -36,6 +36,22 @@ async function signInUI(page, email, destination) {
     assert.ok(transient && attempt < 2, `UI sign-in failed: ${message}`);
   }
 }
+async function rejectWrongArea(page, email, wrongPath, message, correctLink, correctPath) {
+  await page.goto(origin + wrongPath);
+  await page.locator('#login-email').fill(email);
+  await page.locator('#login-password').fill(password);
+  const received = page.waitForResponse(response => response.url() === origin + '/api/auth/login');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  const response = await received;
+  assert.equal(response.status(), 403);
+  assert.equal((await response.json()).accessToken, undefined);
+  await page.getByRole('alert').filter({ hasText: message }).waitFor();
+  assert.equal(page.url(), origin + wrongPath);
+  assert.equal(await page.evaluate(() => localStorage.getItem('eventhub.session.v1')), null);
+  await page.getByRole('link', { name: correctLink, exact: true }).click();
+  await page.waitForURL(origin + correctPath);
+  checks.push(message);
+}
 async function api(path, account, method = 'GET', body) {
   const response = await fetch(origin + '/api' + path, { method, headers: { ...(account ? { authorization: 'Bearer ' + account.accessToken } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30000) });
   const data = await response.json();
@@ -72,8 +88,8 @@ try {
   observe(page);
   await page.goto(origin + '/');
   await screenshot(page, 'home-desktop');
-  await page.goto(origin + '/participante/login');
   const participantEmail = fixtures.participant.email;
+  await rejectWrongArea(page, participantEmail, '/organizacao/login', 'Esta conta é de participante. Acesse a área do participante.', 'Acesso de participante', '/participante/login');
   await signInUI(page, participantEmail, '/eventos');
   await page.getByRole('heading', { name: 'Eventos com Inscrições Abertas', exact: true }).waitFor();
   await page.getByText(event.title, { exact: true }).first().waitFor();
@@ -116,7 +132,7 @@ try {
   activePage = organizationPage;
   organizationPage.setDefaultTimeout(60000);
   observe(organizationPage);
-  await organizationPage.goto(origin + '/participante/login');
+  await rejectWrongArea(organizationPage, organizer.email, '/participante/login', 'Esta conta é de organizador. Acesse a área do organizador.', 'Acesso de organização', '/organizacao/login');
   await signInUI(organizationPage, organizer.email, '/organizacao/eventos');
   await organizationPage.getByRole('heading', { name: 'Gestão de Cursos e Eventos Acadêmicos', exact: true }).waitFor();
   await organizationPage.getByText(event.title, { exact: true }).first().waitFor();
@@ -126,7 +142,7 @@ try {
   assert.equal(await organizationPage.locator('#event-org').inputValue(), organization.name);
   assert.equal(await organizationPage.locator('#event-org').getAttribute('readonly'), '');
   await screenshot(organizationPage, 'organizer-event-editor-desktop');
-  checks.push('Organizer login from participant entry retains organizer profile and fixed institution');
+  checks.push('Organizer login in the correct area retains organizer profile and fixed institution');
   await organizationPage.goto(origin + '/organizacao/eventos/' + event.id + '/visualizar');
   await organizationPage.getByRole('heading', { name: event.title, exact: true }).waitFor();
   assert.equal(await organizationPage.getByRole('link', { name: 'Inscrever-se na atividade' }).count(), 0);

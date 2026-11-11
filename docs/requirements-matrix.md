@@ -51,7 +51,7 @@ No projeto, **organização** (`organizations`, `organizationId`) representa a *
 
 | ID e fonte | Regra | Situação inicial | Componentes | Aceitação e verificação |
 | --- | --- | --- | --- | --- |
-| P01 · P §2 | Exatamente um perfil por conta, sem alternância. | Conflitante. | Identity, frontend, gateway. | Perfil escalar validado/persistido; login em outra área não muda papel nem concede autorização. |
+| P01 · P §2; ajuste solicitado em 11/11/2026 | Exatamente um perfil por conta, sem alternância; login deve corresponder à área escolhida. | Conflitante. | Identity, frontend, gateway. | Perfil escalar validado/persistido; participante na área de organizador e organizador na área de participante recebem erro, sem token/sessão. O aviso orienta usar a área correta; a escolha nunca altera o perfil. |
 | P02 · P §2 | Organizador exatamente uma instituição; instituição aceita vários organizadores. | Conflitante. | Identity e migração. | Segundo vínculo rejeitado por API e integridade; dois organizadores podem compartilhar a mesma instituição. |
 | P03 · P §2 | Responsabilidade por evento + mesma instituição, cumulativas. | Ausente. | Events, identity, dependentes managed. | Colega da mesma instituição não administra evento de outro responsável. |
 | P04 · P §2,5 | Perfil/vínculo imunes a IDs/formulário/storage manipulados. | Parcial. | Autorização de todos serviços e frontend. | IDs do cliente confrontados com usuário atual do servidor; acesso direto protegido. |

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { createApp } from '../../services/identity/src/app.js';
 import { createUserService } from '../../services/identity/src/users/service.js';
+import { hashPassword } from '../../services/identity/src/security/passwords.js';
 import { createOrganizationService } from '../../services/identity/src/organizations/service.js';
 import { createOrganizationRepository } from '../../services/identity/src/organizations/repository.js';
 import { createTokens } from '../../services/identity/src/security/tokens.js';
@@ -34,6 +35,68 @@ test('direct API rejects role/institution injection into registration and own pr
   ]) assert.equal((await request('/auth/register', 'POST', body)).status, 400);
   for (const body of [{ name: 'New Name', role: 'ORGANIZER' }, { name: 'New Name', organizationId }])
     assert.equal((await request('/users/me', 'PATCH', body)).status, 400);
+});
+
+test('direct login API rejects the wrong area before issuing a token and accepts the persisted profile', async t => {
+  const password = 'testPassword123';
+  const passwordHash = await hashPassword(password);
+  let issued = 0;
+  const accounts = new Map([
+    ['participant@example.test', { id: userId, role: 'PARTICIPANT', organizationId: null }],
+    ['organizer@example.test', { id: userId, role: 'ORGANIZER', organizationId }],
+  ]);
+  const service = createUserService({
+    findCredentials: async email => ({ ...accounts.get(email), email, passwordHash, credentialsVersion: 0 }),
+  }, {
+    issue: async user => { issued += 1; return `token-${user.role}`; },
+    expiresIn: 900,
+  });
+  const request = await httpApp(t, { service, tokens: {} });
+  for (const [email, area, message] of [
+    ['participant@example.test', 'organization', 'Esta conta é de participante. Acesse a área do participante.'],
+    ['organizer@example.test', 'participant', 'Esta conta é de organizador. Acesse a área do organizador.'],
+  ]) {
+    const response = await request('/auth/login', 'POST', { email, password, area });
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error, 'account_area_mismatch');
+    assert.equal(body.message, message);
+    assert.equal(body.accessToken, undefined);
+  }
+  assert.equal(issued, 0);
+  for (const [email, area, role] of [
+    ['participant@example.test', 'participant', 'PARTICIPANT'],
+    ['organizer@example.test', 'organization', 'ORGANIZER'],
+    ['participant@example.test', undefined, 'PARTICIPANT'],
+    ['organizer@example.test', undefined, 'ORGANIZER'],
+  ]) {
+    const response = await request('/auth/login', 'POST', { email, password, ...(area ? { area } : {}) });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.user.role, role);
+    assert.equal(body.accessToken, `token-${role}`);
+  }
+  assert.equal(issued, 4);
+});
+
+test('direct login API validates area values and preserves generic credential errors', async t => {
+  const passwordHash = await hashPassword('testPassword123');
+  let issued = 0;
+  const service = createUserService({
+    findCredentials: async () => ({ id: userId, role: 'PARTICIPANT', passwordHash }),
+  }, { issue: async () => { issued += 1; return 'unexpected'; } });
+  const request = await httpApp(t, { service, tokens: {} });
+  for (const area of ['ORGANIZER', 'admin', '', null, ['participant']]) {
+    const response = await request('/auth/login', 'POST', { email: 'participant@example.test', password: 'testPassword123', area });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error, 'invalid_input');
+  }
+  const response = await request('/auth/login', 'POST', {
+    email: 'participant@example.test', password: 'wrongPassword123', area: 'organization',
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).message, 'E-mail ou senha incorretos.');
+  assert.equal(issued, 0);
 });
 
 test('direct organization API denies participant reads and mutations', async t => {

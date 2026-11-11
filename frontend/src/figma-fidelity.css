@@ -16,8 +16,8 @@
 .figma-organization-login .login-submit{border-radius:8px;box-shadow:0 1px 2px #22619233;font-weight:500;padding:9px 16px}
 .figma-organization-login .auth-card-footer>a:after{content:'';display:inline-block;width:9.041px}
 .figma-organization-login .required-mark{display:none}
-.figma-organization-login .auth-area-nav,.figma-organization-login .auth-other-area{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
-.figma-organization-login .auth-area-nav:focus-within,.figma-organization-login .auth-other-area:focus-within{width:auto;height:auto;padding:8px;clip-path:none;background:white;z-index:5}
+.figma-organization-login .auth-area-nav,.figma-organization-login .auth-other-area:not(.auth-other-area-visible){position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+.figma-organization-login .auth-area-nav:focus-within,.figma-organization-login .auth-other-area:not(.auth-other-area-visible):focus-within{width:auto;height:auto;padding:8px;clip-path:none;background:white;z-index:5}
 .figma-managed-shell{background:#f9f9ff;--primary:#226192;--primary-text:#226192;--border:#c7c4d8;--muted:#777587;min-height:1400px}
 .figma-managed-shell:has(.manage-first-event){min-height:1121px}
 .figma-managed-shell>.business-main{max-width:none;padding:32px;flex:none;margin:0 auto}

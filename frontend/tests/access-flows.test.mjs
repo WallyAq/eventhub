@@ -47,7 +47,13 @@ async function fixture(t, user, { cachedUser, rejectIdentity = false, unavailabl
     const body = req.postDataJSON();
     requests.push({ path, query: url.search, method: req.method(), body, headers: req.headers() });
     const reply = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
-    if (path === '/auth/login') return reply(credentials);
+    if (path === '/auth/login') {
+      const expectedRole = body.area === 'organization' ? 'ORGANIZER' : 'PARTICIPANT';
+      if (user.role !== expectedRole) return reply({ message: user.role === 'PARTICIPANT'
+        ? 'Esta conta é de participante. Acesse a área do participante.'
+        : 'Esta conta é de organizador. Acesse a área do organizador.' }, 403);
+      return reply(credentials);
+    }
     if (path === '/users/me') return unavailableIdentity ? reply({ message: 'Identidade temporariamente indisponível' }, 503) : rejectIdentity ? reply({ message: 'Sessão inválida' }, 401) : reply({ user });
     if (path === '/organizations') return reply({ organizations: [institution] });
     if (path === '/organizations/' + organizationId) return reply({ organization: institution });
@@ -87,12 +93,18 @@ async function signIn(page, area, user) {
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }
 
-test('participant login from organization entry keeps participant profile and blocks organizer routes', async t => {
+test('participant login from organization entry shows an error without creating a session', async t => {
   const { page, requests } = await fixture(t, participant);
   await signIn(page, 'organizacao', participant);
+  await page.getByRole('alert').filter({ hasText: 'Esta conta é de participante. Acesse a área do participante.' }).waitFor();
+  assert.equal(page.url(), origin + '/organizacao/login');
+  assert.equal(await page.evaluate(() => localStorage.getItem('eventhub.session.v1')), null);
+  assert.deepEqual(requests.find(req => req.path === '/auth/login').body, { email: participant.email, password: 'SenhaDeTeste123', area: 'organization' });
+  assert.equal(requests.some(req => req.path !== '/auth/login'), false);
+  await page.getByRole('link', { name: 'Acesso de participante', exact: true }).click();
+  await signIn(page, 'participante', participant);
   await page.waitForURL(origin + '/eventos');
   await page.getByRole('heading', { name: 'Eventos com Inscrições Abertas' }).waitFor();
-  assert.deepEqual(requests.find(req => req.path === '/auth/login').body, { email: participant.email, password: 'SenhaDeTeste123' });
   await page.goto(origin + '/organizacao/eventos');
   await page.waitForURL(origin + '/eventos');
   assert.equal(requests.some(req => req.path === '/events' && req.query === '?managed=true'), false);
@@ -101,9 +113,16 @@ test('participant login from organization entry keeps participant profile and bl
   assert.equal(await page.getByRole('link', { name: 'Instituição e equipe' }).count(), 0);
 });
 
-test('organizer login from participant entry redirects to management and blocks personal registrations', async t => {
+test('organizer login from participant entry shows an error without creating a session', async t => {
   const { page, requests } = await fixture(t, organizer);
   await signIn(page, 'participante', organizer);
+  await page.getByRole('alert').filter({ hasText: 'Esta conta é de organizador. Acesse a área do organizador.' }).waitFor();
+  assert.equal(page.url(), origin + '/participante/login');
+  assert.equal(await page.evaluate(() => localStorage.getItem('eventhub.session.v1')), null);
+  assert.deepEqual(requests.find(req => req.path === '/auth/login').body, { email: organizer.email, password: 'SenhaDeTeste123', area: 'participant' });
+  assert.equal(requests.some(req => req.path !== '/auth/login'), false);
+  await page.getByRole('link', { name: 'Acesso de organização', exact: true }).click();
+  await signIn(page, 'organizacao', organizer);
   await page.waitForURL(origin + '/organizacao/eventos');
   await page.getByRole('heading', { name: 'Gestão de Cursos e Eventos Acadêmicos' }).waitFor();
   await page.goto(origin + '/minhas-inscricoes');

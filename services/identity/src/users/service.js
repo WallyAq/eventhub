@@ -67,7 +67,9 @@ export function createUserService(repository, tokens) {
       }
     },
     async login(body) {
-      fields(body, ['email', 'password']);
+      fields(body, ['email', 'password', 'area']);
+      if (body.area !== undefined && !['participant', 'organization'].includes(body.area))
+        throw new UserError(400, 'invalid_input', 'Área de acesso inválida.');
       const { email, password } = credentials(body);
       const found = await repository.findCredentials(email);
       // Allocate the deliberately expensive dummy hash only for unknown accounts.
@@ -75,6 +77,10 @@ export function createUserService(repository, tokens) {
       if (!found) dummyHash ??= hashPassword(randomBytes(32).toString('hex'));
       const valid = await verifyPassword(password, found?.passwordHash || await dummyHash);
       if (!found || !valid) throw new UserError(401, 'invalid_credentials', 'E-mail ou senha incorretos.');
+      if (body.area !== undefined && found.role !== (body.area === 'organization' ? 'ORGANIZER' : 'PARTICIPANT'))
+        throw new UserError(403, 'account_area_mismatch', found.role === 'PARTICIPANT'
+          ? 'Esta conta é de participante. Acesse a área do participante.'
+          : 'Esta conta é de organizador. Acesse a área do organizador.');
       const { passwordHash, credentialsVersion, ...user } = found;
       return { accessToken: await tokens.issue({ ...user, credentialsVersion }), tokenType: 'Bearer', expiresIn: tokens.expiresIn, user };
     },

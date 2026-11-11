@@ -22,7 +22,7 @@ export function AccountLogin({ area }: { area: AccessArea }) {
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, area);
       try { if (remember) localStorage.setItem(key, email.trim()); else localStorage.removeItem(key); } catch { /* Armazenamento opcional. */ }
       auth.signIn(result); setPassword(''); navigate(accountDestination(result.user.role), { replace: true });
     } catch (error) { setError(errorMessage(error)); }
@@ -47,6 +47,6 @@ export function AccountLogin({ area }: { area: AccessArea }) {
       <button className="primary-button login-submit" type="submit">{busy ? 'Entrando…' : 'Entrar'}</button>
     </fieldset></form>
     <div className="auth-card-footer">Não tem uma conta? <Link to={access.register}>{area === 'organization' ? 'Cadastre-se' : 'Cadastre-se gratuitamente'}</Link></div>
-  </section><div className="auth-other-area"><Link to={other.login}>Acesso de {other.label.toLowerCase()}</Link></div></AuthLayout>;
+  </section><div className={'auth-other-area' + (error ? ' auth-other-area-visible' : '')}><Link to={other.login}>Acesso de {other.label.toLowerCase()}</Link></div></AuthLayout>;
 }
 

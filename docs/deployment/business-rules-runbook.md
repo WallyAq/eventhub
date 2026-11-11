@@ -37,7 +37,7 @@ Para inscrições e pagamentos, o diagnóstico deve resultar em um plano por ID 
 - Confirmação paga sem recibo local: confronte inscrição, usuário, valor e referência com a transação proprietária de Payments/Provider. Um recibo só pode ser reconstituído por reparação versionada e auditada quando houver prova de aprovação correspondente. Ausência de prova mantém o conflito; não crie uma aprovação fictícia.
 - Pagamento tardio ou vínculo divergente: preserve transação e inscrição. Uma aprovação externa posterior ao cancelamento/expiração não reativa a inscrição. Identifique o estado efetivo e a referência correta por contratos/backup; pagamento sem inscrição não deve ser apagado. Reembolso real e casos sem prova exigem decisão específica, pois o projeto usa simulação.
 
-O ambiente local diagnosticado nesta entrega estava vazio; nenhuma dessas reparações de histórico foi necessária ou executada nele. Os planos explícitos de perfil e responsabilidade descritos em `docs/access-rules.md` não saneiam automaticamente pagamentos.
+O diagnóstico local anterior às migrações não encontrou dados de negócio; nenhuma dessas reparações de histórico foi necessária ou executada nele. No preflight posterior do ajuste de login havia uma conta, preservada sem conflitos pela atualização. Os planos explícitos de perfil e responsabilidade descritos em `docs/access-rules.md` não saneiam automaticamente pagamentos.
 
 ## Homologação isolada
 
@@ -52,6 +52,7 @@ node --test tests/integration/capacity-isolation.mjs
 node --test tests/integration/access-migrations.mjs
 node --test tests/integration/payment-recovery.mjs
 node tests/integration/frontend-live.mjs
+node --test tests/integration/login-area.mjs
 node tests/integration/trace-evidence.mjs
 ```
 
@@ -104,7 +105,9 @@ Depois da promoção, execute a verificação somente de leitura abaixo. Ela exi
 node scripts/verify-local-deployment.mjs
 ```
 
-**Estado final registrado em 11/11/2026: promoção local aplicada e verificação posterior aprovada.** `tmp/rules-qa/local-deployment.json` contém `status=updated_and_ready`. `tmp/rules-postdeployment-verification.json` contém `status=passed`: 14 contêineres saudáveis, 11 imagens iguais às de QA, 9 verificações HTTP, `/api/status=ready` e cinco migrações com checksums corretos. A auditoria posterior manteve as contagens anteriores (zero usuários/eventos/inscrições/pagamentos), sem conflitos e sem reparação arbitrária de histórico. O backup local 9/9 e a UI QA foram verificados antes da promoção. Produção remota permanece sem destino identificado/acessível e não foi atualizada.
+**Estado final registrado em 11/11/2026: promoção local aplicada e verificação posterior aprovada.** `tmp/rules-qa/local-deployment.json` contém `status=updated_and_ready`. `tmp/rules-postdeployment-verification.json` contém `status=passed`: 14 contêineres saudáveis, 11 imagens iguais às de QA, 9 verificações HTTP, `/api/status=ready` e cinco migrações com checksums corretos. A auditoria mais recente, após o ajuste de login, manteve as contagens de seu preflight (um usuário, zero eventos/inscrições/pagamentos), sem conflitos e sem reparação arbitrária de histórico. O diagnóstico original anterior às migrações tinha zero usuários. O backup local 9/9 e a UI QA foram verificados antes da promoção original. Produção remota permanece sem destino identificado/acessível e não foi atualizada.
+
+O ajuste posterior de erro no login cruzado atualizou somente as imagens de Identity/frontend após **8 testes Identity, 14 testes de interface e 4 testes integrados QA aprovados**. Não acrescenta migrações. Evidência específica em `output/visual-audit/2026-11-11/login-area/verification.json`; atualização local em `tmp/rules-qa/login-area-deployment.json`. O registro corrente de implantação foi atualizado com os novos IDs de imagem, preservando o anterior em `tmp/rules-qa/before-login-area-deployment.json`.
 
 ## Verificação e reversão
 
