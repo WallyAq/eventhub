@@ -1,6 +1,6 @@
 # Implementação e evidências das regras do EventHub
 
-Registro de 10/11/2026. A [matriz de requisitos](../requirements-matrix.md) preserva o diagnóstico anterior às alterações e a origem de cada regra. Este resumo descreve o código presente no workspace e separa resultados executados de verificações ainda pendentes. Não comprova implantação em produção.
+Levantamento de 10/11/2026, encerramento atualizado em 11/11/2026. A [matriz de requisitos](../requirements-matrix.md) preserva o diagnóstico anterior às alterações e a origem de cada regra. Este resumo descreve o código presente no workspace e separa resultados executados de verificações ainda pendentes. A implantação verificada é local, em `http://localhost:8080`; produção remota não foi atualizada.
 
 ## Alterações principais
 
@@ -15,13 +15,13 @@ Registro de 10/11/2026. A [matriz de requisitos](../requirements-matrix.md) pres
 | Reporting: `app/domain.py`; `compose.yaml` | Expõe ocupação, reservas vigentes, vagas e anomalia de capacidade, além de transações do Payments por estado. Indisponibilidade ou inconsistência da fonte financeira fica explícita, sem falsos zeros. CSV preserva escopo, campos antigos e proteção de texto. Compose fornece `PAYMENTS_URL`. | RF11, RQ03, RQ05 |
 | Attendance e Certificates: `services/{attendance,certificates}/test/test_rules.py` | Testes registram os critérios preexistentes de presença, autorização, conclusão temporal e integridade; não introduzem percentuais de frequência ou controle de saída. | RF09–RF10, RN06 |
 | Frontend: `src/auth/{AuthContext,RequireAccount,session,access}`, `src/App.tsx`, layouts e páginas de acesso, instituição, eventos, inscrições e `organization/DashboardPage.tsx` | Rotas e menus seguem o perfil validado no servidor; cache local é revalidado antes de montar páginas protegidas. Área de login divergente não converte perfil. Instituição do organizador é fixa e preview gerenciado não oferece inscrição. Dashboard usa transações/ocupação fornecidas pela API, explica indisponibilidade financeira e mantém fallback para relatório legado. Fluxos mantêm recuperação de erro e estados de carregamento. | RF01–RF05, RF11, P01–P04, P07 |
-| Operação: `scripts/{audit-business-data,init-rules-qa,backup-local-verified,trace-registration}.mjs`; preflights e resolvedores de legado | Diagnóstico somente de leitura, QA separado, backup com restauração de clones e rastreamento por correlação. Resolução de legado exige plano explícito revisado e mantém histórico. | P06, P08, RQ06–RQ08 |
+| Operação: `scripts/{audit-business-data,init-rules-qa,backup-local-verified,promote-local-validated,verify-local-deployment,trace-registration}.mjs`; preflights e resolvedores de legado | Diagnóstico somente de leitura, QA separado, backup com restauração de clones, promoção das imagens validadas, verificação posterior e rastreamento por correlação. Resolução de legado exige plano explícito revisado e mantém histórico. | P06, P08, RQ06–RQ08 |
 
 Os arquivos de interface e ativos já modificados no workspace foram mantidos. As referências visuais orientam apresentação e navegação; textos ilegíveis nas imagens não foram transformados em regras de negócio.
 
 ## Migrações versionadas
 
-Cada serviço aplica apenas migrações do próprio banco, em transação e sob trava consultiva. Os loaders calculam SHA-256 sobre SQL UTF-8 com CRLF normalizado para LF, registram nome/checksum/data e interrompem a inicialização diante de conteúdo divergente. Não se deve editar SQL já aplicado para atualizar uma instalação.
+Cada serviço aplica apenas migrações do próprio banco, em transação e sob trava consultiva. Os loaders calculam SHA-256 sobre SQL UTF-8, registram nome/checksum/data e interrompem a inicialização diante de conteúdo divergente. Identity, Events e Registrations normalizam CRLF para LF; Payments calcula o hash do conteúdo UTF-8 preservado. `.gitattributes` fixa LF para os arquivos SQL também em checkouts Windows, preservando o checksum dos artefatos. Não se deve editar SQL já aplicado para atualizar uma instalação.
 
 | Banco e registro | Arquivo | Proteção acrescentada |
 | --- | --- | --- |
@@ -73,8 +73,11 @@ Resultados comunicados pela validação desta entrega em 10/11/2026:
 | `node --test tests/integration/business-rules.mjs` | **8 PASS, 0 FAIL**, saída 0 em **97,6 s** (`97598.3427 ms`) | Fluxo HTTP e persistência reais no QA: perfis/instituição, responsabilidade e exportação, concorrência/FIFO, pagamento/callback, expiração sem Events, falha de consumidores/broker, presença e certificados. Saída final em `tmp/rules-qa/integration-results.log`. |
 | `node --test tests/integration/payment-recovery.mjs` | **3 PASS, 0 FAIL** em aproximadamente **11,57 s** | Aprovação tardia após cancelamento não reativa nem retoma a vaga; provedor parado mantém uma transação pendente e a reconciliação confirma após retorno; callback repetido preserva o estado válido. Usa somente fixtures e serviços QA. |
 | `node tests/integration/frontend-live.mjs` | **7 verificações reais aprovadas**, **16 screenshots**, `errors=[]` | Chromium contra `http://127.0.0.1:18080`, sem interceptação das APIs; desktop de 1440 px e mobile de 390 px. Evidência em `output/visual-audit/2026-11-10/live/verification.json`. Essas verificações são adicionais aos testes contabilizados abaixo. |
+| `node tests/integration/trace-evidence.mjs` | **PASS**, somente leitura do QA | Executa `scripts/trace-registration.mjs` com projeto/ambiente QA explícitos. Uma inscrição paga confirmada, sua transação aprovada e três mensagens de outbox possuem o mesmo correlationId; 29 registros correlacionados em Registrations, Payments, Gateway e Provider. Resultado em `tmp/rules-qa/trace-evidence.json`; não implica entrega SMTP. |
 | `node scripts/backup-local-verified.mjs` | **9/9 bancos restaurados** em clones isolados de QA | Origem exclusivamente no stack local `eventhub`; manifesto em `tmp/rules-backups/20261111005248655/manifest.json`, com SHA-256 de cada dump/papéis e contagem de tabelas restauradas. Não é backup de produção. |
 | Auditoria somente de leitura do stack local anterior | Perfis compatíveis e zero eventos, conforme `docs/access-rules.md` | Diagnóstico local anterior às migrações; não representa dados remotos nem valida as novas restrições aplicadas. |
+| Promoção local das imagens validadas | **APLICADA**, `status=updated_and_ready` | `tmp/rules-qa/local-deployment.json` registra as 11 imagens, IDs anteriores/validados, tags para reversão e readiness em `http://127.0.0.1:8080`. Configuração, chaves e volumes existentes foram preservados. O QA ficou parado para liberar recursos. |
+| `node scripts/verify-local-deployment.mjs` | **PASS** | 14 contêineres saudáveis; 11 imagens idênticas às aprovadas em QA; 9 verificações HTTP; `/api/status=ready`; cinco migrações com checksums correspondentes ao código. `tmp/rules-postdeployment-verification.json` e `tmp/rules-postdeployment-data-audit.json` registram contagens iguais ao preflight (zero usuários/eventos/inscrições/pagamentos) e todos os conflitos iguais a zero. Verificação somente de leitura, sem inserir fixtures no ambiente local. |
 
 Total de testes unitários/de domínio/de navegador aprovados: **53**. Isolamento de capacidade e migrações acrescentam **9 testes em PostgreSQL QA**, a suíte HTTP de negócio acrescenta **8** e recuperação de pagamentos acrescenta **3**: **73 testes aprovados** nesta revisão. As 7 verificações de UI real, o build e as nove restaurações são evidências adicionais, não testes contados nesse total.
 
@@ -92,7 +95,6 @@ O manifesto de backup local registra restauração bem-sucedida e `tableCount` d
 
 | Verificação | Estado nesta revisão do relatório | Condição de conclusão |
 | --- | --- | --- |
-| Promoção das imagens aprovadas ao stack local `eventhub`, porta 8080 | **PREPARADA; resultado de execução ainda não registrado** | `scripts/promote-local-validated.mjs` confere backup/UI/suíte HTTP, bloqueia contexto Docker remoto e conflitos de dados, preserva tags anteriores e promove as imagens QA. A conclusão exige `status=updated_and_ready` em `tmp/rules-qa/local-deployment.json` e verificação posterior do destino. Backup local 9/9 já restaurado em clones QA. |
 | Implantação/verificação posterior em produção remota | **NÃO EXECUTADA; destino não identificado/acessível** | Destino autorizado, backup restaurável e decisões sobre conflitos reais, aplicação coordenada e smoke tests do destino. O stack local não é produção remota. |
 | Ensaio de pico 20× | **NÃO EXECUTADO; carga base não definida** | Definir volume base, recursos, duração e critério de êxito antes de medir. Concorrência de capacidade não demonstra throughput 20×. |
 

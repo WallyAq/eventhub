@@ -52,6 +52,7 @@ node --test tests/integration/capacity-isolation.mjs
 node --test tests/integration/access-migrations.mjs
 node --test tests/integration/payment-recovery.mjs
 node tests/integration/frontend-live.mjs
+node tests/integration/trace-evidence.mjs
 ```
 
 O bootstrap de QA cria chaves e configuração novas no diretório temporário, porta 18080, `RESERVATION_TTL_SECONDS=120` e projeto/volumes separados; não reutiliza `.env` atual nem dados reais. Uma configuração QA já existente é preservada pelo bootstrap: conferir o TTL efetivo antes do ensaio, sem imprimir os demais valores/segredos. O prazo de 120 segundos é de teste; o padrão do produto continua 900 segundos.
@@ -63,6 +64,8 @@ A suíte fixa o projeto de QA e injeta falhas/fixtures somente nele. Não mude e
 **Estado registrado em 10/11/2026:** isolamento de capacidade aprovado no PostgreSQL QA (**5 PASS, 0 FAIL**, aproximadamente 140,8 s); migrações de acesso/legado aprovadas (**4 PASS, 0 FAIL**, aproximadamente 30,5 s); suíte HTTP de negócio aprovada (**8 PASS, 0 FAIL**, saída 0, aproximadamente 97,6 s); recuperação de pagamentos aprovada (**3 PASS, 0 FAIL**, aproximadamente 11,57 s). Somados aos 53 testes isolados/de navegador: **73 testes aprovados**. Saída final da suíte HTTP em `tmp/rules-qa/integration-results.log`. Tentativas anteriores tiveram timeout de inicialização e HTTP 503 no cadastro durante builds/restaurações concorrentes; a execução posterior à readiness passou. [Resumo de implementação e evidências](../validation/implementation-summary.md).
 
 A navegação com backend QA real aprovou **7 verificações**, com **16 screenshots** em desktop de 1440 px e mobile de 390 px e `errors=[]`. Evidência: `output/visual-audit/2026-11-10/live/verification.json`. Os fluxos incluem entrada dos dois perfis, catálogo, inscrição gratuita/paga, aprovação, bloqueio de área indevida, instituição fixa, preview e indicadores reais. Essas verificações são adicionais aos 73 testes contabilizados.
+
+O verificador de rastreamento usa somente leitura sobre os dados/logs QA e executa o auxiliar `scripts/trace-registration.mjs` com `COMPOSE_PROJECT_NAME` e `COMPOSE_ENV_FILES` próprios do QA. Requer PostgreSQL e Registrations QA em execução e logs das operações anteriores disponíveis (janela de 48 horas). A captura aprovada registrou um correlationId comum na inscrição paga confirmada, transação aprovada e três mensagens de outbox, com 29 logs em quatro serviços. Evidência em `tmp/rules-qa/trace-evidence.json`. A primeira conferência usou um nome de serviço incorreto para Provider; corrigida para o nome emitido `payment-provider-simulator`, a captura passou. Isso não altera os serviços nem conta como teste adicional aos 73.
 
 As suites de domínio podem ser executadas em cada imagem ou ambiente Python com os requisitos do serviço. Exemplo a partir da raiz, usando a imagem de QA e os testes montados como leitura:
 
@@ -83,7 +86,7 @@ Repita para `attendance`, `certificates` e `notifications`, mudando serviço e d
 
 Cada serviço inicializa somente suas tabelas/migrações sob trava. Migração com checksum divergente ou diagnóstico impeditivo deve interromper a inicialização. Não edite uma migração já aplicada; crie próxima versão. A mudança de regras de perfil e responsabilidade exige atualização coordenada: código anterior que escreve estados agora proibidos não é uma reversão segura.
 
-Os registros são `identity_db.schema_migrations` (Identity `007_exclusive_profiles_and_institution.sql`), `event_db.event_schema_migrations` (Events `001_event_responsibility.sql`), `registration_db.schema_migrations` (Registrations `001` e `002`) e `payment_db.payment_schema_migrations` (Payments `001`). Compare com os SHA-256 do [resumo desta revisão](../validation/implementation-summary.md), normalizando CRLF para LF como os loaders.
+Os registros são `identity_db.schema_migrations` (Identity `007_exclusive_profiles_and_institution.sql`), `event_db.event_schema_migrations` (Events `001_event_responsibility.sql`), `registration_db.schema_migrations` (Registrations `001` e `002`) e `payment_db.payment_schema_migrations` (Payments `001`). Compare com os SHA-256 do [resumo desta revisão](../validation/implementation-summary.md). Identity, Events e Registrations normalizam CRLF para LF; Payments usa o conteúdo UTF-8 preservado. O verificador local aplica a mesma regra de cada loader.
 
 ## Promoção validada ao stack local
 
@@ -95,7 +98,13 @@ node scripts/promote-local-validated.mjs --backup-manifest tmp/rules-backups/202
 
 Durante a aplicação, o auxiliar para o QA para liberar RAM, fecha o Nginx local durante a atualização coordenada e inicia os grupos de serviços locais pela ordem das dependências, preservando volumes/configuração. Não mantenha dois stacks de aplicação completos ativos ao mesmo tempo nesta máquina. O registro `tmp/rules-qa/local-deployment.json` guarda IDs anteriores/validados, tags para retorno, destino, auditoria e readiness. Só `status=updated_and_ready`, acompanhado de `/api/status` pronto e verificação posterior do destino, permite declarar a promoção concluída.
 
-**Estado até este registro: promoção preparada, resultado da aplicação ainda não registrado.** O backup local 9/9 e a UI QA já foram verificados. Produção remota permanece sem destino identificado/acessível; promover para 8080 não equivale a atualizar produção remota.
+Depois da promoção, execute a verificação somente de leitura abaixo. Ela exige o registro de promoção concluída, confere saúde/IDs das imagens, páginas públicas e bloqueios sem autenticação, readiness, checksums das cinco migrações e auditoria de dados. A comparação das contagens com o preflight pressupõe a janela local sem gravações de usuários; fora dela, alterações legítimas exigem análise.
+
+```powershell
+node scripts/verify-local-deployment.mjs
+```
+
+**Estado final registrado em 11/11/2026: promoção local aplicada e verificação posterior aprovada.** `tmp/rules-qa/local-deployment.json` contém `status=updated_and_ready`. `tmp/rules-postdeployment-verification.json` contém `status=passed`: 14 contêineres saudáveis, 11 imagens iguais às de QA, 9 verificações HTTP, `/api/status=ready` e cinco migrações com checksums corretos. A auditoria posterior manteve as contagens anteriores (zero usuários/eventos/inscrições/pagamentos), sem conflitos e sem reparação arbitrária de histórico. O backup local 9/9 e a UI QA foram verificados antes da promoção. Produção remota permanece sem destino identificado/acessível e não foi atualizada.
 
 ## Verificação e reversão
 
