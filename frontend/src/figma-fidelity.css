@@ -21,12 +21,13 @@
 .figma-managed-shell{background:#f9f9ff;--primary:#226192;--primary-text:#226192;--border:#c7c4d8;--muted:#777587;min-height:1400px}
 .figma-managed-shell:has(.manage-first-event){min-height:1121px}
 .figma-managed-shell>.business-main{max-width:none;padding:32px;flex:none;margin:0 auto}
-.figma-managed-shell .topbar{height:64px;min-height:64px;border:0;box-shadow:0 1px 0 #c7c4d8;padding:0 32px}
-.figma-managed-shell .topnav{gap:24px}
-.figma-managed-shell .topnav>a{font-size:14px;line-height:20px;font-weight:400;height:32px}
-.figma-managed-shell .topnav>a.active{font-weight:500}
-.figma-managed-shell .account-trigger{font-size:14px;line-height:17.5px}
-.figma-managed-shell .avatar{background:#e9edff;border-color:#c7c4d8;color:#226192}
+/* Keep the organizer header identical across event, dashboard and account pages. */
+.organization-shell .topbar{--primary:#226192;--primary-text:#226192;height:64px;min-height:64px;border:0;box-shadow:0 1px 0 #c7c4d8;padding:0 32px}
+.organization-shell .topnav{gap:24px}
+.organization-shell .topnav>a{font-size:14px;line-height:20px;font-weight:400;height:32px}
+.organization-shell .topnav>a.active{font-weight:500}
+.organization-shell .account-trigger{font-size:14px;line-height:17.5px}
+.organization-shell .avatar{background:#e9edff;border-color:#c7c4d8;color:#226192}
 .figma-managed-shell>.organization-footer{display:none}
 .figma-managed-shell .business-heading{margin:0 0 32px;min-height:68px}
 .figma-managed-shell .business-heading h1{font-size:32px;line-height:40px;font-weight:600;letter-spacing:-.8px;margin:0 0 4px}
@@ -66,5 +67,5 @@
 .figma-managed-shell .manage-onboarding__step{width:28px;height:28px;min-width:28px;border-radius:12px;font-size:12px;background:#e9edff}
 .figma-managed-shell .manage-onboarding h3{font-size:16px;line-height:24px;font-weight:600;margin:0}
 .figma-managed-shell .manage-onboarding li>p{font-size:13px;line-height:21.13px;margin:0}
-@media(max-width:1000px){.figma-managed-shell .topbar{height:auto;padding:12px 24px;gap:12px}.figma-managed-shell .topnav{min-height:36px}.figma-managed-shell .topnav>a{min-height:32px}.figma-managed-shell .business-heading{align-items:flex-start;flex-wrap:wrap}.figma-managed-shell .manage-onboarding{padding:28px}.figma-managed-shell .manage-onboarding ol{grid-template-columns:1fr}.figma-managed-shell .filter-bar{flex-wrap:wrap}}
+@media(max-width:1000px){.organization-shell .topbar{height:auto;padding:12px 24px;gap:12px}.organization-shell .topnav{min-height:36px}.organization-shell .topnav>a{min-height:32px}.figma-managed-shell .business-heading{align-items:flex-start;flex-wrap:wrap}.figma-managed-shell .manage-onboarding{padding:28px}.figma-managed-shell .manage-onboarding ol{grid-template-columns:1fr}.figma-managed-shell .filter-bar{flex-wrap:wrap}}
 @media(max-width:700px){.figma-managed-shell{min-height:100dvh}.figma-managed-shell:has(.manage-first-event){min-height:100dvh}.figma-managed-shell>.business-main{padding:24px 16px}.figma-managed-shell .business-heading h1{font-size:26px;line-height:34px}.figma-managed-shell .filter-bar .search-field{margin-right:0}.figma-managed-shell .filter-bar select{width:100%}.figma-managed-shell .manage-first-event{padding:40px 20px}.figma-managed-shell .manage-first-event h3{font-size:22px;line-height:30px}.figma-managed-shell .manage-onboarding{padding:24px 20px}.figma-organization-login .auth-heading p{min-height:0}}

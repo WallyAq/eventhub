@@ -74,7 +74,6 @@ export function OrganizationsPage() {
       </fieldset></form> : <p>{selected.description || 'Sem descrição.'}</p>}
       <h3>Equipe</h3>
       <ul className="member-list">{members.map(member => <li key={member.id}><strong>{member.name}</strong><span>{member.email}</span><small>{member.role === 'OWNER' ? 'Responsável' : 'Organizador'}</small></li>)}</ul>
-      <p>O vínculo institucional não é alterado nesta tela. A equipe pode conter vários organizadores, e cada um administra somente os eventos sob sua responsabilidade.</p>
     </section>}
   </section></main></AppLayout>;
 }

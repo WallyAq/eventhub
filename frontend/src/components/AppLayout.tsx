@@ -12,6 +12,9 @@ export function AppLayout({ area = 'participant', children }: { area?: AccessAre
   const { session, signOut } = useAuth();
   const location = useLocation();
   const managedHome = area === 'organization' && location.pathname === '/organizacao/eventos';
+  const managementView = new URLSearchParams(location.search).get('visao') === 'gerenciar';
+  const organizerDashboard = location.pathname === '/organizacao/painel' || /^\/organizacao\/eventos\/[^/]+\/painel$/.test(location.pathname);
+  const managingEvents = !organizerDashboard && ((managedHome && managementView) || location.pathname.startsWith('/organizacao/eventos/'));
   const [menu, setMenu] = useState(false);
   const menuMotion = usePresenceMotion<HTMLDivElement>(menu);
   const [confirm, setConfirm] = useState(false);
@@ -49,14 +52,17 @@ export function AppLayout({ area = 'participant', children }: { area?: AccessAre
   const initials = (session?.user.name || '').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase();
   return <div className={'application-shell' + (area === 'participant' ? ' participant-shell' : ' organization-shell') + (managedHome ? ' figma-managed-shell' : '')}>
     <header className="topbar">
-      <Brand to={area === 'participant' ? '/eventos' : '/organizacao/eventos'} design={managedHome ? 'blue' : undefined} />
+      <Brand to={area === 'participant' ? '/eventos' : '/organizacao/eventos'} design={area === 'organization' ? 'blue' : undefined} />
       <nav className="topnav" aria-label="Navegação principal">
-        {managedHome ? <><Link className={!location.search ? 'active' : undefined} aria-current={!location.search ? 'page' : undefined} to="/organizacao/eventos">Página Inicial</Link><Link className={location.search ? 'active' : undefined} aria-current={location.search ? 'page' : undefined} to="/organizacao/eventos?visao=gerenciar">Gerenciar Eventos</Link><Link to="/organizacao/painel">Dashboard</Link></> : area === 'participant' ? <><NavLink to="/eventos">Página Inicial</NavLink><NavLink to="/minhas-inscricoes">Minhas Inscrições</NavLink></> :
-          <><NavLink to="/organizacao/eventos">Gerenciar Eventos</NavLink><NavLink to="/organizacao/painel">Painel Geral</NavLink><NavLink to="/organizacoes">Instituição e equipe</NavLink><NavLink to="/organizacao/perfil">Meu Perfil</NavLink></>}
+        {area === 'organization' ? <>
+          <Link className={managedHome && !managementView ? 'active' : undefined} aria-current={managedHome && !managementView ? 'page' : undefined} to="/organizacao/eventos">Página Inicial</Link>
+          <Link className={managingEvents ? 'active' : undefined} aria-current={managingEvents ? 'page' : undefined} to="/organizacao/eventos?visao=gerenciar">Gerenciar Eventos</Link>
+          <Link className={organizerDashboard ? 'active' : undefined} aria-current={organizerDashboard ? 'page' : undefined} to="/organizacao/painel">Dashboard</Link>
+        </> : <><NavLink to="/eventos">Página Inicial</NavLink><NavLink to="/minhas-inscricoes">Minhas Inscrições</NavLink></>}
       </nav>
       <div className="account-menu" ref={menuContainer}>
         <button ref={trigger} type="button" className="account-trigger" aria-label="Menu da conta" aria-expanded={menu} onClick={() => setMenu(value => !value)}><span className="avatar">{initials}</span><span>{session?.user.name}</span></button>
-        {menuMotion.rendered && <div ref={menuMotion.ref} className="account-popover" inert={!menu}><div className="popover-identity"><span className="avatar">{initials}</span><div><strong>{session?.user.name}</strong><small>{session?.user.email}</small></div></div><Link onClick={() => setMenu(false)} to={area === 'organization' ? '/organizacao/perfil' : '/perfil'}><img src="/figma/e12a2.svg" alt="" />Meu perfil</Link>{managedHome && <Link onClick={() => setMenu(false)} to="/organizacoes"><img src="/figma/b47cd.svg" alt="" />Instituição e equipe</Link>}<button type="button" onClick={() => { setMenu(false); setConfirm(true); }}><img src="/figma/c3fac.svg" alt="" />Sair</button></div>}
+        {menuMotion.rendered && <div ref={menuMotion.ref} className="account-popover" inert={!menu}><div className="popover-identity"><span className="avatar">{initials}</span><div><strong>{session?.user.name}</strong><small>{session?.user.email}</small></div></div><Link onClick={() => setMenu(false)} to={area === 'organization' ? '/organizacao/perfil' : '/perfil'}><img src="/figma/e12a2.svg" alt="" />Meu perfil</Link>{area === 'organization' && <Link onClick={() => setMenu(false)} to="/organizacoes"><img src="/figma/b47cd.svg" alt="" />Instituição e equipe</Link>}<button type="button" onClick={() => { setMenu(false); setConfirm(true); }}><img src="/figma/c3fac.svg" alt="" />Sair</button></div>}
       </div>
     </header>
     {children}
