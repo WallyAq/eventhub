@@ -26,9 +26,13 @@ async function request(path: string, method: string, body?: unknown, token?: str
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
     cache: 'no-store',
   });
-  const data = record(await response.json());
-  if (!response.ok) throw new ApiError(response.status, typeof data.message === 'string' ? data.message : typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) ? 'Verifique os campos, datas e horários informados.' : 'Não foi possível concluir a operação.');
-  return data;
+  // Proxies may return HTML or an empty body: preserve their HTTP status as well.
+  const bodyData: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const data = bodyData && typeof bodyData === 'object' && !Array.isArray(bodyData) ? bodyData as Record<string, unknown> : {};
+    throw new ApiError(response.status, typeof data.message === 'string' ? data.message : typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) ? 'Verifique os campos, datas e horários informados.' : 'Não foi possível concluir a operação.');
+  }
+  return record(bodyData);
 }
 export async function registerParticipant(name: string, email: string, password: string, details: Record<string, unknown> = {}) {
   return parseUser((await request('/auth/register', 'POST', { name, email, password, ...details })).user);

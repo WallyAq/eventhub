@@ -16,7 +16,10 @@ export async function reserve(token:string,eventId:string,activityId:string,key:
 export function useData<T>(path:string){
   const {session}=useAuth(),token=session?.token;
   const [data,setData]=useState<T|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[version,setVersion]=useState(0);
-  useEffect(()=>{let active=true;setLoading(true);setError('');api<T>(path,token).then(value=>{if(active)setData(value);}).catch(error=>{if(active)setError(errorMessage(error));}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[path,token,version]);
+  const [failure,setFailure]=useState<{cause:unknown}|null>(null);
+  useEffect(()=>{let active=true;setLoading(true);setError('');setFailure(null);api<T>(path,token).then(value=>{if(active)setData(value);}).catch(error=>{if(active){setError(errorMessage(error));setFailure({cause:error});}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[path,token,version]);
+  // A failed initial GET blocks the page; refresh and form errors stay inline.
+  if(failure&&!data)throw failure.cause;
   return {data,error,loading,reload:()=>setVersion(value=>value+1)};
 }
 export const money=(cents:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);

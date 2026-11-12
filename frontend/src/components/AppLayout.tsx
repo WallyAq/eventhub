@@ -6,12 +6,14 @@ import { useAuth } from '../auth/AuthContext';
 import { logoutSession } from '../services/identity';
 import type { AccessArea } from '../auth/access';
 import './app-layout.css';
+import { usePresenceMotion } from '../motion/usePresenceMotion';
 
 export function AppLayout({ area = 'participant', children }: { area?: AccessArea; children: ReactNode }) {
   const { session, signOut } = useAuth();
   const location = useLocation();
   const managedHome = area === 'organization' && location.pathname === '/organizacao/eventos';
   const [menu, setMenu] = useState(false);
+  const menuMotion = usePresenceMotion<HTMLDivElement>(menu);
   const [confirm, setConfirm] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const logoutPending = useRef(false), live = useRef(false), latestToken = useRef(session?.token);
@@ -54,7 +56,7 @@ export function AppLayout({ area = 'participant', children }: { area?: AccessAre
       </nav>
       <div className="account-menu" ref={menuContainer}>
         <button ref={trigger} type="button" className="account-trigger" aria-label="Menu da conta" aria-expanded={menu} onClick={() => setMenu(value => !value)}><span className="avatar">{initials}</span><span>{session?.user.name}</span></button>
-        {menu && <div className="account-popover"><div className="popover-identity"><span className="avatar">{initials}</span><div><strong>{session?.user.name}</strong><small>{session?.user.email}</small></div></div><Link onClick={() => setMenu(false)} to={area === 'organization' ? '/organizacao/perfil' : '/perfil'}><img src="/figma/e12a2.svg" alt="" />Meu perfil</Link>{managedHome && <Link onClick={() => setMenu(false)} to="/organizacoes"><img src="/figma/b47cd.svg" alt="" />Instituição e equipe</Link>}<button type="button" onClick={() => { setMenu(false); setConfirm(true); }}><img src="/figma/c3fac.svg" alt="" />Sair</button></div>}
+        {menuMotion.rendered && <div ref={menuMotion.ref} className="account-popover" inert={!menu}><div className="popover-identity"><span className="avatar">{initials}</span><div><strong>{session?.user.name}</strong><small>{session?.user.email}</small></div></div><Link onClick={() => setMenu(false)} to={area === 'organization' ? '/organizacao/perfil' : '/perfil'}><img src="/figma/e12a2.svg" alt="" />Meu perfil</Link>{managedHome && <Link onClick={() => setMenu(false)} to="/organizacoes"><img src="/figma/b47cd.svg" alt="" />Instituição e equipe</Link>}<button type="button" onClick={() => { setMenu(false); setConfirm(true); }}><img src="/figma/c3fac.svg" alt="" />Sair</button></div>}
       </div>
     </header>
     {children}

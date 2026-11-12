@@ -12,20 +12,6 @@ coverage/
 test-results/
 playwright-report/
 
-# Local QA environment and temporary outputs for organizer feature validation.
-tmp/backend-completion-unit-env/
-tmp/organizer-features-*.log
-tmp/certificate-personalizado-preview.png
-tmp/render-custom-certificate.py
-tmp/rf07-*.log
-tmp/rf07-08-*.log
-tmp/rq06-*.log
-tmp/rq08-*.log
-tmp/rq08-*.json
-tmp/organization-redesign-*.log
-tmp/participant-theme-*.log
-tmp/figma-audit/
-tmp/rules-qa/
-tmp/rules-*.json
-tmp/rules-backups/
+tmp/
+output/
 

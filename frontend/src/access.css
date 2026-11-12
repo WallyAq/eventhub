@@ -1,5 +1,5 @@
-.login-choice-page{min-height:100dvh;padding:32px;display:flex;align-items:center;justify-content:center;background:#f7f9fd;--primary:#226192;--primary-text:#226192}
-.login-choice{width:100%;max-width:1276px;min-height:700px;display:flex;flex-direction:column;align-items:center}
+.login-choice-page{position:relative;min-height:100dvh;padding:72px 32px;display:flex;align-items:center;justify-content:center;background:#f7f9fd;--primary:#226192;--primary-text:#226192}
+.login-choice{width:100%;max-width:1276px;display:flex;flex-direction:column;align-items:center}
 .login-choice>header{text-align:center;padding-top:5.5px;margin-bottom:48px}
 .login-choice>header h1{font-size:48px;line-height:48px;letter-spacing:-1.2px;font-weight:700;color:#0f172a;margin:12px 0}
 .login-choice>header>p:last-child{font-size:16px;line-height:24px;color:#64748b;margin:0}
@@ -14,9 +14,9 @@
 .login-choice__options .primary-button{width:100%;gap:8px;margin-top:40px;padding:14px 24px;border:0;border-radius:8px;font-size:14px;line-height:20px;font-weight:500;box-shadow:none;background:#226192;color:white}
 .login-choice__options .primary-button:hover{background:#194f73}
 .login-choice__options .primary-button img{display:block;flex-shrink:0}
-.login-choice__register{align-self:center;font-size:14px;line-height:20px;font-weight:500;color:#226192;margin-top:16px;text-decoration:none}
 .login-choice__note{max-width:576px;margin:56px 0 0;color:#64748be6;font-size:12px;line-height:16px;text-align:center}
-.login-choice__back{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
-.login-choice__back:focus{position:static;width:auto;height:auto;clip-path:none;margin-top:24px;font-size:13px}
+.login-choice__navigation{position:absolute;top:24px;left:24px}
+.login-choice__back{display:inline-block;font-size:13px;line-height:20px;text-decoration:none}
+.login-choice__back:hover{text-decoration:underline}
 .login-choice-page :focus-visible{outline-color:#90bdd8}
-@media(max-width:750px){.login-choice-page{padding:40px 16px}.login-choice{min-height:0}.login-choice>header{margin-bottom:32px}.login-choice>header h1{font-size:32px;line-height:38px;letter-spacing:-.8px}.login-choice__options{grid-template-columns:minmax(0,502px);gap:20px}.login-choice__options>article{padding:28px;min-height:0}.login-choice__options h2{font-size:26px}.login-choice__options .primary-button{padding:14px 12px;font-size:13px;margin-top:28px}.login-choice__note{margin-top:32px}}
+@media(max-width:750px){.login-choice-page{padding:72px 16px}.login-choice{min-height:0}.login-choice__navigation{left:16px}.login-choice>header{margin-bottom:32px}.login-choice>header h1{font-size:32px;line-height:38px;letter-spacing:-.8px}.login-choice__options{grid-template-columns:minmax(0,502px);gap:20px}.login-choice__options>article{padding:28px;min-height:0}.login-choice__options h2{font-size:26px}.login-choice__options .primary-button{padding:14px 12px;font-size:13px;margin-top:28px}.login-choice__note{margin-top:32px}}

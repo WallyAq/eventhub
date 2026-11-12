@@ -68,7 +68,7 @@ export function CatalogPage() {
   const pages = Math.max(1, Math.ceil(events.length / PAGE_SIZE)), current = Math.min(page, pages);
   const visible = events.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE), numbers = pageNumbers(current, pages);
   return <BusinessLayout><div className="participant-catalog">
-    <Feedback loading={loading} error={error} />
+    <Feedback loading={loading} error={error} skeleton={!data} />
     {error && <button type="button" className="secondary-button" onClick={reload}>Tentar novamente</button>}
     {!loading && !error && <>
       {featured && <section className="participant-featured" aria-labelledby="featured-title"><h2 id="featured-title">Congresso em Destaque</h2><article className="participant-featured-card">
@@ -80,9 +80,9 @@ export function CatalogPage() {
         <div className="filter-bar"><EventFilters query={query} setQuery={value => { setQuery(value); setPage(1); }} modality={modality} setModality={value => { setModality(value); setPage(1); }} /></div>
         <div className="events-grid">{visible.map(event => <EventCard key={event.id} event={event} />)}</div>
         {!events.length && <div className="empty-state"><h3>Nenhum evento encontrado</h3><p>{query || modality ? 'Nenhum evento corresponde à busca e aos filtros selecionados.' : 'Os eventos publicados pelas organizações aparecerão aqui.'}</p>{(query || modality) && <button type="button" className="secondary-button" onClick={() => { setQuery(''); setModality(''); setPage(1); }}>Limpar filtros</button>}</div>}
-        <div className="participant-pagination"><p role="status">{events.length ? <>Mostrando <strong>{(current - 1) * PAGE_SIZE + 1} a {Math.min(current * PAGE_SIZE, events.length)}</strong> de <strong>{events.length}</strong> eventos acadêmicos</> : 'Nenhum evento disponível'}</p>
+        {events.length > 0 && <div className="participant-pagination"><p role="status">Mostrando <strong>{(current - 1) * PAGE_SIZE + 1} a {Math.min(current * PAGE_SIZE, events.length)}</strong> de <strong>{events.length}</strong> eventos acadêmicos</p>
           {pages > 1 && <nav aria-label="Páginas de eventos"><button type="button" aria-label="Página anterior" disabled={current === 1} onClick={() => setPage(current - 1)}>‹</button>{numbers.map((number, index) => <span className="participant-pagination-item" key={number}>{index > 0 && number - numbers[index - 1] > 1 && <span className="participant-pagination-gap" aria-hidden="true">…</span>}<button type="button" aria-label={'Página ' + number} aria-current={number === current ? 'page' : undefined} onClick={() => setPage(number)}>{number}</button></span>)}<button type="button" aria-label="Próxima página" disabled={current === pages} onClick={() => setPage(current + 1)}>›</button></nav>}
-        </div>
+        </div>}
       </section>
     </>}
   </div></BusinessLayout>;

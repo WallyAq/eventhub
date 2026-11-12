@@ -6,7 +6,8 @@
 }
 
 :where(button, .primary-button, .secondary-button, .access-action, .topnav > a,
-  .profile-selector a, .account-popover a, .participant-details__back) {
+  .profile-selector a, .account-popover a, .participant-details__back,
+  .home-cta, .home-nav nav > a, .login-choice__back, .auth-area-nav a) {
   transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease,
     border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease,
     translate var(--motion-fast) var(--motion-ease);
@@ -36,42 +37,12 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Only page content enters; fixed navigation and dialog ancestors stay still. */
-  :where(.access-intro, .business-heading, .page-heading,
-    .participant-details__back, .participant-event-list > h2) {
-    animation: eventhub-rise-in 220ms var(--motion-ease) backwards;
-  }
-
-  :where(.figma-card, .access-card, .event-card, .participant-featured-card,
-    .participant-details__activity, .participant-details__speaker,
-    .my-registration-card, .empty-state, .my-registrations-empty) {
-    animation: eventhub-rise-in var(--motion-enter) var(--motion-ease) backwards;
-  }
-
-  /* A bounded stagger keeps long lists responsive and never waits on polling. */
-  :where(.access-options, .events-grid, .participant-details__activities,
-    .participant-details__speakers, .my-registrations-grid) > :nth-child(2) {
-    animation-delay: 35ms;
-  }
-  :where(.events-grid, .participant-details__speakers, .my-registrations-grid) > :nth-child(3) {
-    animation-delay: 70ms;
-  }
-  :where(.events-grid, .my-registrations-grid) > :nth-child(n + 4) {
-    animation-delay: 100ms;
-  }
-
-  /* These panels can contain dialogs: an opacity-only entrance avoids a new
-     positioning context for any fixed descendants. */
-  :where(.business-card, .profile-card, .organization-panel, .filter-bar,
-    .password-section, .participant-profile__card > section > form,
-    .organization-profile__card > section > form) {
+  /* Route/scroll entries belong to MotionEnhancements. Form panels only fade:
+     they may own a fixed dialog and must never acquire a translated ancestor. */
+  :where(.password-section, .participant-profile__card > section > form,
+    .organization-profile__card > section > form, [role="tabpanel"],
+    .organizer-panel, .empty-state, .my-registrations-empty) {
     animation: eventhub-fade-in 220ms ease backwards;
-  }
-
-  .account-popover,
-  .speaker-picker__popup {
-    transform-origin: top right;
-    animation: eventhub-popover-in 180ms var(--motion-ease) backwards;
   }
 
   dialog[open]:not(.participant-checkout) {
@@ -92,24 +63,80 @@
   .participant-checkout__activity:nth-of-type(2) { animation-delay: 35ms; }
   .participant-checkout__activity:nth-of-type(n + 3) { animation-delay: 70ms; }
 
-  :where(.success, .error, .participant-checkout__result) {
+  :where(.success, .error, .organizer-dialog__error, .dashboard-warning,
+    .participant-checkout__result, .existing-registration-notice) {
     animation: eventhub-fade-in 180ms ease backwards;
   }
 
-  :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):active {
+  :where(.primary-button, .secondary-button, .danger-button, .access-action, .home-cta):not(:disabled):not([aria-disabled="true"]):active {
     translate: 0 1px;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):hover {
+    :where(.primary-button, .secondary-button, .danger-button, .access-action, .home-cta):not(:disabled):not([aria-disabled="true"]):hover {
       translate: 0 -1px;
       box-shadow: 0 4px 10px #3525cd1a;
     }
-    :where(.primary-button, .secondary-button, .danger-button, .access-action):not(:disabled):not([aria-disabled="true"]):active {
+    :where(.primary-button, .secondary-button, .danger-button, .access-action, .home-cta):not(:disabled):not([aria-disabled="true"]):active {
       translate: 0 1px;
+    }
+    :where(.event-card:not(.loading-skeleton__card), .login-choice__options > article,
+      .dashboard-event, .participant-details__speaker):hover {
+      translate: 0 -2px;
+      box-shadow: 0 6px 16px #17304912;
+    }
+    .login-choice__options .primary-button:hover img { translate: 2px -2px; }
+  }
+
+  .loading-state__label::before { animation: eventhub-spin 600ms linear infinite; }
+  .loading-skeleton__line { animation: eventhub-skeleton 600ms ease-in-out infinite alternate; }
+
+  /* Native close() still releases focus synchronously. Only the paint of
+     persistent dialogs exits; resource-owning/unmounted dialogs close immediately. */
+  @supports (transition-behavior: allow-discrete) {
+    :is(.logout-dialog, .my-registration-cancel-dialog) {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete;
+    }
+    :is(.logout-dialog, .my-registration-cancel-dialog)[open] {
+      opacity: 1;
+      pointer-events: auto;
+      animation: none;
+    }
+    :is(.logout-dialog, .my-registration-cancel-dialog)::backdrop {
+      opacity: 0;
+      animation: none;
+      transition: opacity 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete;
+    }
+    :is(.logout-dialog, .my-registration-cancel-dialog)[open]::backdrop { opacity: 1; }
+    :is(.logout-dialog, .my-registration-cancel-dialog):not([open])::backdrop { pointer-events: none; }
+    @starting-style {
+      :is(.logout-dialog, .my-registration-cancel-dialog)[open],
+      :is(.logout-dialog, .my-registration-cancel-dialog)[open]::backdrop { opacity: 0; }
     }
   }
 }
+
+:where(.event-card, .login-choice__options > article, .dashboard-event,
+  .participant-details__speaker, .login-choice__options .primary-button img) {
+  transition: translate var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) ease;
+}
+.account-popover, .speaker-picker__popup { transform-origin: top right; }
+.loading-state__label { display: flex; align-items: center; gap: 8px; }
+.loading-state__label::before {
+  content: ''; width: 14px; height: 14px; flex-shrink: 0;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  color: var(--primary);
+}
+.loading-skeleton__card { min-height: 320px; pointer-events: none; }
+.loading-skeleton__line {
+  display: block; width: 100%; height: 14px; margin-bottom: 18px;
+  border-radius: 4px; background: #e7edf4;
+}
+.loading-skeleton__title { height: 24px; width: 70%; margin-bottom: 28px; }
+.loading-skeleton__short { width: 55%; }
+.loading-skeleton__action { height: 40px; margin-top: auto; margin-bottom: 0; }
 
 @keyframes eventhub-fade-in {
   from { opacity: 0; }
@@ -119,14 +146,12 @@
   from { opacity: 0; translate: 0 8px; }
   to { opacity: 1; translate: 0 0; }
 }
-@keyframes eventhub-popover-in {
-  from { opacity: 0; translate: 0 -4px; scale: .985; }
-  to { opacity: 1; translate: 0 0; scale: 1; }
-}
 @keyframes eventhub-dialog-in {
   from { opacity: 0; translate: 0 8px; scale: .99; }
   to { opacity: 1; translate: 0 0; scale: 1; }
 }
+@keyframes eventhub-spin { to { rotate: 360deg; } }
+@keyframes eventhub-skeleton { from { opacity: .5; } to { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, *::backdrop {

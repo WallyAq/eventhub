@@ -20,9 +20,12 @@ import { OrganizerEventPage } from './pages/events/OrganizerEventPage';
 import { EventDetailsPage } from './pages/events/DetailsPage';
 import { CheckoutPage } from './pages/registrations/CheckoutPage';
 import { MyRegistrationsPage } from './pages/registrations/MyRegistrationsPage';
+import { MotionEnhancements } from './motion/MotionEnhancements';
+import { ErrorPage } from './pages/ErrorPage';
+import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 
 export default function App() {
-  return <BrowserRouter><AuthProvider><Routes>
+  return <BrowserRouter><MotionEnhancements /><AuthProvider><RouteErrorBoundary><Routes>
     <Route path="/" element={<HomePage />} />
     <Route path="/acesso" element={<AccessPage />} />
     <Route path="/participante/login" element={<ParticipantLoginPage />} />
@@ -52,7 +55,8 @@ export default function App() {
     <Route path="/pagamento/:id" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
     <Route path="/inscricoes/:id" element={<RequireAccount area="participant"><CheckoutPage /></RequireAccount>} />
     <Route path="/minhas-inscricoes" element={<RequireAccount area="participant"><MyRegistrationsPage /></RequireAccount>} />
-    <Route path="*" element={<Navigate to="/acesso" replace />} />
-  </Routes></AuthProvider></BrowserRouter>;
+    <Route path="/erro/:code" element={<ErrorPage />} />
+    <Route path="*" element={<ErrorPage error={{ status: 404 }} />} />
+  </Routes></RouteErrorBoundary></AuthProvider></BrowserRouter>;
 }
 

@@ -1,0 +1,31 @@
+.error-page{--primary:#226192;--primary-text:#226192;--border:#c7c4d8;background:white;color:#141b2b}
+.error-page>.application-shell,.error-page__shell{min-height:100dvh;display:flex;flex-direction:column;background:white}
+.error-page .topbar{flex-shrink:0}
+.error-page .error-screen{width:100%;flex:1;display:flex;align-items:center;justify-content:center;padding:64px 24px 80px;text-align:center;background:white}
+.error-screen__content{width:100%;max-width:616px}
+.error-screen__illustration{display:block;width:268px;height:204px;margin:0 auto 96px}
+.error-screen h1{font-size:36px;line-height:1.25;letter-spacing:-.9px;margin:0 0 12px;font-weight:600}
+.error-screen__description{font-size:18px;line-height:28px;color:#4c5d77;margin:0 0 32px}
+.error-screen__actions{display:flex;gap:16px}
+.error-screen__actions>.primary-button,.error-screen__actions>.secondary-button{flex:1;min-height:54px;border-radius:12px;font-size:16px;font-weight:600;box-shadow:none}
+.error-page .error-screen .primary-button{background:#226192}
+.error-page .error-screen .primary-button:hover{background:#194f73}
+.error-page .error-screen .secondary-button{border:1px solid #226192;color:#226192;background:white}
+.error-page .error-screen .secondary-button:hover{background:#edf4fa}
+.error-screen__code{display:flex;align-items:center;justify-content:center;gap:16px;max-width:340px;margin:40px auto 0;color:#617594;font-size:14px;line-height:22px}
+.error-screen__code:before,.error-screen__code:after{content:'';height:1px;flex:1;background:#dfe5ef}
+.error-page .participant-footer,.error-page .organization-footer,.error-page__footer{margin-top:0;flex-shrink:0;border-top:1px solid #c7c4d8;background:white}
+.error-page .participant-footer__content{min-height:104px}
+.error-page .organization-footer,.error-page__footer{min-height:104px;padding:26px 40px;display:flex;align-items:center;justify-content:space-between;gap:24px;color:#464555;font-size:12px}
+.error-page__footer .figma-brand{width:145px}
+.error-page__footer p{margin:0}
+@media(max-width:700px){
+  .error-page .error-screen{padding:48px 20px}
+  .error-screen__illustration{width:214px;height:auto;margin-bottom:40px}
+  .error-screen h1{font-size:27px;letter-spacing:-.6px}
+  .error-screen__description{font-size:16px;line-height:26px}
+  .error-screen__actions{flex-direction:column;gap:12px}
+  .error-screen__actions>.primary-button,.error-screen__actions>.secondary-button{flex:auto;min-height:50px}
+  .error-screen__code{margin-top:28px}
+  .error-page .organization-footer,.error-page__footer{padding:24px 16px;align-items:flex-start;flex-direction:column;gap:14px}
+}

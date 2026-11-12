@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FocusEvent, KeyboardEvent } from 'react';
 import type { Speaker } from '../../services/business';
 import './speaker-picker.css';
+import { usePresenceMotion } from '../../motion/usePresenceMotion';
 
 export type SpeakerOption = { value: string; speaker: Speaker; legacy?: boolean };
 type Props = {
@@ -24,6 +25,7 @@ export function SpeakerPicker({ id, options, value, onChange, onAdd, disabled = 
   const suppressFocusOpen = useRef(false);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const popupMotion = usePresenceMotion<HTMLDivElement>(open);
   const [activeIndex, setActiveIndex] = useState(-1);
   const selected = options.find(option => option.value === value);
   const needle = searchable(query.trim());
@@ -117,7 +119,7 @@ export function SpeakerPicker({ id, options, value, onChange, onAdd, disabled = 
       <input ref={input} id={id} type="text" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} aria-activedescendant={open ? activeOption : undefined} aria-required={required || undefined} aria-describedby={selected ? `${id}-selected-info` : undefined} autoComplete="off" disabled={disabled} placeholder="Busque por nome, instituição ou titulação" value={query} onFocus={show} onClick={show} onKeyDown={keyDown} onChange={event => { setQuery(event.target.value); setActiveIndex(-1); setOpen(true); }} />
       <button type="button" className="speaker-picker__toggle" aria-label={open ? 'Fechar lista de docentes' : 'Abrir lista de docentes'} tabIndex={-1} disabled={disabled} onMouseDown={event => event.preventDefault()} onClick={() => { if (open) { setOpen(false); setActiveIndex(-1); } else { show(); input.current?.focus(); } }}><img src="/figma/organizer/401ce.svg" alt="" /></button>
     </div>
-    {open && <div className="speaker-picker__popup">
+    {popupMotion.rendered && <div ref={popupMotion.ref} className="speaker-picker__popup" inert={!open}>
       <div className="speaker-picker__results"><span aria-live="polite">{filtered.length} {filtered.length === 1 ? 'docente encontrado' : 'docentes encontrados'}</span><small>Pressione Enter para selecionar</small></div>
       <div className="speaker-picker__options" id={listId} role="listbox" aria-label="Docentes disponíveis">
         {filtered.length ? filtered.map((option, index) => <button type="button" role="option" id={`${id}-option-${index}`} key={option.value} aria-selected={option.value === value} className={`speaker-picker__option${index === activeIndex ? ' is-active' : ''}${option.value === value ? ' is-selected' : ''}`} tabIndex={-1} disabled={disabled} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(option)}>
