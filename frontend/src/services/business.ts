@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { identityRequest, errorMessage } from './identity';
+import { identityRequest, errorMessage, ApiError } from './identity';
 
 export type PriceOption={id:string;lotName:string;category:string;priceCents:number;startsAt:string;endsAt:string};
 export type Activity={id:string;title:string;startsAt:string;endsAt:string;location:string;responsible:string;capacity:number;priceCents:number;kind?:'Curso'|'Minicurso'|'Workshop'|'Palestra';description?:string;waitlistEnabled?:boolean;speakerId?:string|null;priceOptions?:PriceOption[]};
@@ -9,6 +9,13 @@ export type EventData={id:string;organizationId:string;organizationName:string;t
 export type Registration={id:string;userId:string;activityId:string;eventId:string;eventTitle:string;activity:Activity;priceCents:number;status:'PENDING_PAYMENT'|'CONFIRMED'|'CANCELLED'|'EXPIRED'|'WAITLISTED';expiresAt:string|null;createdAt:string;checkInCredential?:string;priceOption?:PriceOption};
 export type Payment={registrationId:string;amountCents:number;status:'PENDING'|'APPROVED'|'DECLINED'|'EXPIRED'};
 export async function api<T>(path:string,token?:string,method='GET',body?:unknown):Promise<T>{return await identityRequest(path,method,body,token) as unknown as T;}
+export async function addEventActivity(token:string,eventId:string,key:string,activity:Omit<Activity,'id'>,speakers:Speaker[]):Promise<{event:EventData}>{
+  const response=await fetch('/api/events/'+encodeURIComponent(eventId)+'/activities',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({activity,speakers}),signal:AbortSignal.timeout(20000)});
+  const data=await response.json().catch(()=>null);
+  if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:typeof data?.message==='string'?data.message:'Não foi possível adicionar a atividade. Confira os campos e tente novamente.');
+  if(!data?.event)throw new Error('Resposta inválida ao adicionar a atividade. Tente novamente.');
+  return data;
+}
 export async function reserve(token:string,eventId:string,activityId:string,key:string,priceOptionId?:string):Promise<Registration>{
   const response=await fetch('/api/registrations',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({eventId,activityId,...(priceOptionId?{priceOptionId}:{})}),signal:AbortSignal.timeout(20000)});
   const data=await response.json(); if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:data.message || 'Não foi possível reservar. Tente novamente.');return data.registration;

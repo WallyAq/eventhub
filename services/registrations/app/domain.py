@@ -151,14 +151,14 @@ def availability(id: UUID):
     activities = event["activities"]
     try:
         with db() as conn:
-            rows = conn.execute("""SELECT i.activity_id, i.capacity,
+            rows = conn.execute("""SELECT i.activity_id, i.capacity, i.closed_at,
                 count(r.id) FILTER (WHERE r.status='CONFIRMED' OR
                     (r.status='PENDING_PAYMENT' AND r.expires_at>statement_timestamp())) AS occupied,
                 count(r.id) FILTER (WHERE r.status='WAITLISTED') AS waiting,
                 statement_timestamp() AS checked_at
                 FROM inventories i LEFT JOIN registrations r ON r.activity_id=i.activity_id
                 WHERE i.event_id=%s AND i.activity_id=ANY(%s::uuid[])
-                GROUP BY i.activity_id, i.capacity""",
+                GROUP BY i.activity_id, i.capacity, i.closed_at""",
                 (id, [item["id"] for item in activities])).fetchall()
     except psycopg.Error:
         raise HTTPException(503, "Disponibilidade de vagas indisponível. Tente novamente.")
@@ -172,7 +172,7 @@ def availability(id: UUID):
         # Vacancies released by expiry belong to existing FIFO waiters before newcomers.
         allocated = inventory["occupied"] + inventory["waiting"] if inventory else 0
         result.append({"activityId": activity["id"], "capacity": capacity,
-                       "availableSeats": max(0, capacity - allocated) if accepting else 0})
+                       "availableSeats": max(0, capacity - allocated) if accepting and not (inventory and inventory["closed_at"]) else 0})
     return {"eventId": event["id"], "checkedAt": checked_at, "activities": result}
 
 class Reservation(BaseModel):
@@ -200,6 +200,8 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
             return {"registration":serialize(previous)}
         conn.execute("INSERT INTO inventories(activity_id,event_id,capacity) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",(value.activityId,value.eventId,activity["capacity"]))
         inventory = lock(conn,value.activityId)
+        if inventory["closed_at"]:
+            raise HTTPException(409, "Esta atividade foi retirada da programação e não aceita inscrições.")
         price, rate = selected_price(activity, value.priceOptionId)
         maintain(conn,inventory,event)
         existing = conn.execute("SELECT * FROM registrations WHERE activity_id=%s AND user_id=%s AND status IN ('CONFIRMED','PENDING_PAYMENT','WAITLISTED')",(value.activityId,user["id"])).fetchone()
@@ -216,6 +218,27 @@ def reserve(value: Reservation, authorization: str = Header(default=""), idempot
           (str(uuid4()),value.activityId,user["id"],idempotency_key,status,price,status,reservation_ttl(),json.dumps(snapshot))).fetchone()
         event_message(conn,row,"registration.confirmed" if status == "CONFIRMED" else "registration.reserved" if status == "PENDING_PAYMENT" else "registration.waitlisted")
     return {"registration":serialize(row)}
+
+@router.post("/internal/events/{id}/activities/{activity_id}/close")
+def close_activity(id: UUID, activity_id: UUID, request: Request):
+    secured(request)
+    event = remote("EVENTS", "/events/" + str(id))["event"]
+    activity = next((item for item in event["activities"] if item["id"] == str(activity_id)), None)
+    if not activity:
+        raise HTTPException(404, "Atividade não encontrada.")
+    if event["status"] != "PUBLISHED" or datetime.fromisoformat(event["startsAt"].replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+        raise HTTPException(409, "A programação não permite exclusão neste momento.")
+    with db() as conn:
+        conn.execute("INSERT INTO inventories(activity_id,event_id,capacity) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING", (activity_id, id, activity["capacity"]))
+        inventory = lock(conn, activity_id)
+        if str(inventory["event_id"]) != str(id):
+            raise HTTPException(409, "A atividade não pertence ao evento.")
+        if conn.execute("SELECT 1 FROM registrations WHERE activity_id=%s LIMIT 1", (activity_id,)).fetchone():
+            raise HTTPException(409, "Esta atividade possui histórico de inscrições e não pode ser excluída.")
+        conn.execute("UPDATE inventories SET closed_at=coalesce(closed_at,clock_timestamp()) WHERE activity_id=%s", (activity_id,))
+    log_event("activity.closed", eventId=str(id), activityId=str(activity_id))
+    return {"closed": True}
+
 
 def owned(conn,id,user):
     row=conn.execute("SELECT * FROM registrations WHERE id=%s AND user_id=%s",(id,user)).fetchone()

@@ -6,7 +6,7 @@
 }
 
 :where(button, .primary-button, .secondary-button, .access-action, .topnav > a,
-  .profile-selector a, .account-popover a, .participant-details__back,
+  .account-popover a, .participant-details__back,
   .home-cta, .home-nav nav > a, .login-choice__back, .auth-area-nav a) {
   transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease,
     border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease,
@@ -18,7 +18,7 @@
     background-color var(--motion-fast) ease;
 }
 
-:where(.profile-selector a, .modality-options > label, .activity-kind__options > label,
+:where(.modality-options > label, .activity-kind__options > label,
   .activity-payment__choices > label, .organization-choice,
   .participant-checkout__activity, .participant-checkout__methods > label) {
   transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease,

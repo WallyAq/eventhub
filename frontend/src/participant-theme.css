@@ -15,8 +15,7 @@
   outline-color: #90bdd8;
 }
 
-:is(.participant-shell, .participant-auth, .participant-recovery) .brand-logo,
-.participant-auth .profile-selector img {
+:is(.participant-shell, .participant-auth, .participant-recovery) .brand-logo {
   filter: hue-rotate(-35deg);
 }
 
@@ -69,14 +68,8 @@
   border-color: #ccdce8;
 }
 
-.participant-shell .popover-identity,
-.participant-auth .profile-selector nav {
+.participant-shell .popover-identity {
   background: #edf4fa;
-  border-color: #d8e2ed;
-}
-
-.participant-auth .profile-selector a[aria-current=page] {
-  color: var(--primary-text);
   border-color: #d8e2ed;
 }
 

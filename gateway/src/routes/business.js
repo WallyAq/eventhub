@@ -41,6 +41,8 @@ export function createBusinessRouter(services, verify, request = fetch) {
   router.post('/events', forward);
   router.put('/events/:id', forward);
   router.patch('/events/:id/public-information', forward);
+  router.post('/events/:id/activities', forward);
+  router.delete('/events/:id/activities/:activityId', forward);
   router.post('/events/:id/publish', forward);
   router.post('/events/:id/cancel', forward);
   router.get('/registrations', forward);

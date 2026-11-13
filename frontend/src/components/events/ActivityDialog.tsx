@@ -7,9 +7,10 @@ import { OrganizerDialog } from './OrganizerDialog';
 import { SpeakerDialog } from './SpeakerDialog';
 import { SpeakerPicker } from './SpeakerPicker';
 import type { SpeakerOption } from './SpeakerPicker';
+import { errorMessage } from '../../services/identity';
 
 export type ActivityDraft = Omit<Activity, 'id'>;
-type Props = { activity: ActivityDraft; event: { title: string; startsAt: string; endsAt: string }; speakers: Speaker[]; onSave: (activity: ActivityDraft) => void; onClose: () => void; onAddSpeaker: (speaker: Speaker) => void };
+type Props = { activity: ActivityDraft; event: { title: string; startsAt: string; endsAt: string }; speakers: Speaker[]; onSave: (activity: ActivityDraft) => void | Promise<void>; onClose: () => void; onAddSpeaker: (speaker: Speaker) => void };
 const kinds = [['Curso', '95ba4'], ['Minicurso', '31e39'], ['Workshop', '83cdb'], ['Palestra', 'd8fc6']] as const;
 const pad = (value: number) => String(value).padStart(2, '0');
 function localParts(value: string) {
@@ -33,6 +34,7 @@ export function ActivityDialog({ activity, event, speakers, onSave, onClose, onA
   const [price, setPrice] = useState((activity.priceCents / 100).toFixed(2));
   const [free, setFree] = useState(activity.priceCents === 0);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [addingSpeaker, setAddingSpeaker] = useState(false);
   const [addedSpeakers, setAddedSpeakers] = useState<Speaker[]>([]);
   const availableSpeakers = [...speakers, ...addedSpeakers.filter(speaker => !speakers.some(item => item.id === speaker.id))];
@@ -51,8 +53,9 @@ export function ActivityDialog({ activity, event, speakers, onSave, onClose, onA
     setDraft(current => ({ ...current, responsible: speaker?.name || '', speakerId: speaker?.id || null }));
     setError('');
   }
-  function submit(submitEvent: FormEvent<HTMLFormElement>) {
+  async function submit(submitEvent: FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
+    if (saving) return;
     const startsAt = `${day}T${starts}`, endsAt = `${hasSeparateEndDay ? endDay : day}T${ends}`;
     const startDate = new Date(startsAt), endDate = new Date(endsAt), eventStart = new Date(event.startsAt), eventEnd = new Date(event.endsAt);
     const responsibleSpeaker = availableSpeakers.find((speaker, index) => speakerKey(speaker, index) === selectedSpeaker);
@@ -68,12 +71,17 @@ export function ActivityDialog({ activity, event, speakers, onSave, onClose, onA
     const total = Number(capacity), priceCents = rates.length ? Math.min(...rates.map(rate => rate.priceCents)) : free ? 0 : Math.round(Number(price) * 100);
     if (!Number.isInteger(total) || total < 1 || total > 100000) return setError('O número de vagas deve ser um inteiro entre 1 e 100.000.');
     if (!rates.length && !free && (!price || !Number.isFinite(priceCents) || priceCents < 1 || priceCents > 10000000)) return setError('Informe um valor entre R$ 0,01 e R$ 100.000,00, ou marque a atividade como gratuita.');
-    onSave({ ...draft, title: draft.title.trim(), description: draft.description?.trim(), location: draft.location.trim(), responsible: responsible.trim(), speakerId: responsibleSpeaker?.id ?? null, startsAt, endsAt, capacity: total, priceCents });
-    onClose();
+    setSaving(true); setError('');
+    try {
+      await onSave({ ...draft, title: draft.title.trim(), description: draft.description?.trim(), location: draft.location.trim(), responsible: responsible.trim(), speakerId: responsibleSpeaker?.id ?? null, startsAt, endsAt, capacity: total, priceCents });
+      onClose();
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setSaving(false); }
   }
   return <>
-    <OrganizerDialog title={activity.title ? 'Editar Atividade do Evento' : 'Nova Atividade do Evento'} description={<>Cadastre minicursos, palestras ou workshops vinculados ao <strong>{event.title || 'seu evento'}</strong></>} onClose={onClose} onSubmit={submit} className="activity-dialog" figmaNode="2053:2589" footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancelar</button><button type="submit" className="primary-button">Salvar</button></>}>
+    <OrganizerDialog title={activity.title ? 'Editar Atividade do Evento' : 'Nova Atividade do Evento'} description={<>Cadastre minicursos, palestras ou workshops vinculados ao <strong>{event.title || 'seu evento'}</strong></>} onClose={() => { if (!saving) onClose(); }} onSubmit={submit} className="activity-dialog" figmaNode="2053:2589" footer={<><button type="button" className="secondary-button" disabled={saving} onClick={onClose}>Cancelar</button><button type="submit" className="primary-button" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button></>}>
       {error && <p className="organizer-dialog__error" role="alert">{error}</p>}
+      <fieldset disabled={saving} className="activity-dialog-fields">
       <section className="organizer-dialog__section"><h3>1. Informações da Atividade</h3>
         <div className="organizer-dialog__field"><label htmlFor={`${id}-title`}>Nome da atividade<RequiredMark /></label><input id={`${id}-title`} required minLength={2} maxLength={160} placeholder="Ex: Workshop Prático de Visão Computacional" value={draft.title} onChange={change => field('title', change.target.value)} /></div>
         <fieldset className="activity-kind"><legend>Tipo de atividade<RequiredMark /></legend><div className="activity-kind__options">{kinds.map(([kind, icon]) => <label key={kind} className={draft.kind === kind ? 'selected' : ''}><input type="radio" required name={`${id}-kind`} value={kind} checked={draft.kind === kind} onChange={() => field('kind', kind)} /><img src={`/figma/organizer/${icon}.svg`} alt="" /><span>{kind}</span></label>)}</div></fieldset>
@@ -89,6 +97,7 @@ export function ActivityDialog({ activity, event, speakers, onSave, onClose, onA
         {!draft.priceOptions?.length && <div className="activity-payment"><fieldset><legend>Atividade gratuita?<RequiredMark /></legend><div className="activity-payment__choices">{([[true, 'Sim'], [false, 'Não']] as const).map(([value, label]) => <label key={String(value)} className={free === value ? 'selected' : ''}><input type="radio" required name={`${id}-free`} checked={free === value} onChange={() => { setFree(value); setError(''); }} /><span>{label}</span></label>)}</div></fieldset>{!free && <div className="organizer-dialog__field activity-payment__price"><label htmlFor={`${id}-price`}>Valor da inscrição<RequiredMark /></label><div className="organizer-dialog__input-icon"><span className="organizer-dialog__leading-icon">R$</span><input id={`${id}-price`} type="number" required min="0.01" max="100000" step="0.01" value={price} onChange={change => setPrice(change.target.value)} /></div></div>}</div>}
         <PriceOptionsEditor rates={draft.priceOptions || []} eventStart={event.startsAt} onChange={rates => field('priceOptions', rates)} />
       </section>
+      </fieldset>
     </OrganizerDialog>
     {addingSpeaker && <SpeakerDialog onClose={() => setAddingSpeaker(false)} onSave={speaker => { setAddedSpeakers(current => [...current, speaker]); onAddSpeaker(speaker); setSelectedSpeaker(speaker.id!); setDraft(current => ({ ...current, responsible: speaker.name, speakerId: speaker.id })); setError(''); }} />}
   </>;

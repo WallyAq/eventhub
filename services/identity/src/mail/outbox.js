@@ -22,7 +22,7 @@ export function createMailOutbox(pool, delivery) {
           try {
             await delivery.send(row.payload);
             await client.query(`UPDATE mail_outbox SET status='SENT',attempts=attempts+1,
-              payload=payload-'text'-'path',updated_at=now() WHERE id=$1`, [row.id]);
+              payload=payload-'text'-'html'-'path',updated_at=now() WHERE id=$1`, [row.id]);
             console.log(JSON.stringify({ service: 'identity', event: 'mail.sent', messageId: row.id, ...context }));
           } catch {
             // Persist failure before retrying; never mark a failed SMTP call SENT.

@@ -1,0 +1,5 @@
+.public-event-information>form>fieldset{border:0;padding:0;margin:0;min-width:0}
+.public-event-information .form-field{display:grid;gap:8px;margin-bottom:20px;min-width:0}
+.public-event-information .organizer-setting-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:0}
+.public-event-information__actions{display:flex;justify-content:flex-end;margin-top:8px}
+@media(max-width:700px){.public-event-information .organizer-setting-grid{grid-template-columns:1fr}.public-event-information__actions>button{width:100%}}
